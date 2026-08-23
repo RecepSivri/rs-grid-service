@@ -1,0 +1,42 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: rs-grid-service
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Kendi API'lerimize gelen istekleri dogrulamak icin Keycloak'in issuer adresi.
+          # Ornek: http://localhost:8080/realms/rs-grid
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/rs-grid}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# rs-grid-service'e ozel ayarlar: Keycloak Admin REST API'sine baglanmak icin kullanilir.
+rs-grid:
+  security:
+    # false yapilirsa /api/** endpoint'leri JWT dogrulamasi olmadan acilir (sadece local gelistirme icin!).
+    enabled: ${RS_GRID_SECURITY_ENABLED:true}
+  keycloak:
+    # Localinizde calisan Keycloak'in adresi
+    server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8080}
+    # Yonetilecek (kullanicilarin bulundugu) realm
+    realm: ${KEYCLOAK_REALM:rs-grid}
+    # Service account'u acik, realm-management client'indan "manage-users" (veya realm-admin) rolu atanmis confidential client
+    client-id: ${KEYCLOAK_CLIENT_ID:rs-grid-service}
+    client-secret: ${KEYCLOAK_CLIENT_SECRET:CHANGE_ME}
+    connect-timeout-ms: 5000
+    read-timeout-ms: 5000
+    pool-size: 10
+
+logging:
+  level:
+    com.rs.gridservice: DEBUG
+    org.keycloak: INFO
