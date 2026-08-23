@@ -198,8 +198,17 @@ public class KeycloakUserServiceImpl implements UserService {
     }
 
     private void assignUserTypeRole(String userId, UserType userType) {
-        RoleRepresentation role = keycloakAdminClient.realm(keycloakProperties.getRealm())
-                .roles().get(userType.roleName()).toRepresentation();
+        RoleRepresentation role;
+        try {
+            role = keycloakAdminClient.realm(keycloakProperties.getRealm())
+                    .roles().get(userType.roleName()).toRepresentation();
+        } catch (NotFoundException e) {
+            usersResource().get(userId).remove();
+            throw new KeycloakOperationException(
+                    "'" + userType.roleName() + "' realm rolu Keycloak'ta bulunamadi. "
+                            + "Once Keycloak'ta bu rolu olusturmaniz gerekiyor (Realm roles -> Create role). "
+                            + "Kullanici olusturulmadi.", e);
+        }
         usersResource().get(userId).roles().realmLevel().add(Collections.singletonList(role));
     }
 }

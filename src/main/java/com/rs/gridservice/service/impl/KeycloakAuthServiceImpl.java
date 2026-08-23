@@ -1,5 +1,7 @@
 package com.rs.gridservice.service.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rs.gridservice.config.KeycloakProperties;
 import com.rs.gridservice.dto.LoginRequest;
 import com.rs.gridservice.dto.LogoutRequest;
@@ -32,6 +34,7 @@ import org.springframework.web.client.RestClient;
 public class KeycloakAuthServiceImpl implements AuthService {
 
     private final KeycloakProperties keycloakProperties;
+    private final ObjectMapper objectMapper;
 
     private final RestClient restClient = RestClient.create();
 
@@ -58,11 +61,42 @@ public class KeycloakAuthServiceImpl implements AuthService {
             log.info("Kullanici girisi basarili: username={}", request.getUsername());
             return tokenResponse;
         } catch (HttpClientErrorException e) {
-            log.warn("Giris basarisiz: username={}, keycloak status={}", request.getUsername(), e.getStatusCode());
-            throw new InvalidCredentialsException("Kullanici adi veya sifre hatali");
+            throw translateLoginError(e, request.getUsername());
         } catch (HttpServerErrorException | ResourceAccessException e) {
             throw new KeycloakOperationException("Keycloak'a baglanilamadi", e);
         }
+    }
+
+    /**
+     * Keycloak'in token endpoint'inden donen hata govdesini ({@code error} / {@code error_description})
+     * ayristirip gercek sebebe gore uygun exception'a cevirir.
+     *
+     * Keycloak yalnizca gercek kullanici adi/sifre hatalarinda (veya hesap durumu sorunlarinda)
+     * "invalid_grant" doner; client yanlis konfigure edilmisse (orn. client'ta "Direct Access Grants"
+     * kapaliysa "unauthorized_client", secret yanlissa "invalid_client" doner) — bu durumlari
+     * kullaniciya "sifreniz yanlis" diye yansitmamak icin ayirt ediyoruz.
+     */
+    private RuntimeException translateLoginError(HttpClientErrorException e, String username) {
+        String keycloakError = null;
+        String keycloakDescription = null;
+        try {
+            JsonNode body = objectMapper.readTree(e.getResponseBodyAsString());
+            keycloakError = body.path("error").asText(null);
+            keycloakDescription = body.path("error_description").asText(null);
+        } catch (Exception parseEx) {
+            keycloakDescription = e.getResponseBodyAsString();
+        }
+
+        log.warn("Giris basarisiz: username={}, keycloak status={}, error={}, description={}",
+                username, e.getStatusCode(), keycloakError, keycloakDescription);
+
+        if ("invalid_grant".equals(keycloakError)) {
+            return new InvalidCredentialsException(
+                    keycloakDescription != null ? keycloakDescription : "Kullanici adi veya sifre hatali");
+        }
+
+        return new KeycloakOperationException(
+                "Keycloak giris istegini reddetti (error=" + keycloakError + "): " + keycloakDescription, e);
     }
 
     @Override
