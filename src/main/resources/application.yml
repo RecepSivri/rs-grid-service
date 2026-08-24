@@ -13,6 +13,20 @@ spring:
           # Ornek: http://localhost:8080/realms/rs-grid
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/rs-grid}
 
+  # Project/Technology API'leri icin: Keycloak'in kullandigi ayni Postgres sunucusu/database'i.
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/keycloak}
+    username: ${DB_USERNAME:keycloak}
+    password: ${DB_PASSWORD:keycloak}
+  jpa:
+    open-in-view: false
+    hibernate:
+      # local gelistirme icin uygun: entity'lere gore tabloyu otomatik olusturur/gunceller.
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+
 management:
   endpoints:
     web:

@@ -18,7 +18,8 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("rs-grid-service API")
-                        .description("Keycloak Admin REST API'sini wrap eden kullanici yonetim servisi")
+                        .description("Keycloak Admin REST API'sini wrap eden kullanici/grup yonetimi ve "
+                                + "kendi veritabaninda tutulan project ve technology CRUD API'lerini iceren servis")
                         .version("v0.0.1"))
                 .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME))
                 .components(new Components()
