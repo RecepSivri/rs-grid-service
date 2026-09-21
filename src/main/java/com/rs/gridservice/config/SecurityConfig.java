@@ -6,13 +6,20 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 /**
  * rs-grid-service'in kendi API'lerini (Keycloak'i wrap eden endpoint'leri) korur.
@@ -21,8 +28,16 @@ import org.springframework.security.web.access.AccessDeniedHandler;
  * spring.security.oauth2.resourceserver.jwt.issuer-uri (Keycloak realm'i) ile dogrulanir.
  *
  * JWT'nin "realm_access.roles" claim'i {@link KeycloakRealmRoleConverter} ile Spring Security
- * authority'lerine ("ROLE_<rol>") cevrilir; grup API'leri ("/api/v1/groups/**") sadece Keycloak'ta
- * "admin" realm rolune sahip kullanicilar tarafindan cagrilabilir, digerlerine 403 doner.
+ * authority'lerine ("ROLE_<rol>") cevrilir.
+ *
+ * Yetkilendirme kurallari:
+ * - "/api/v1/groups/**" ve kullanici olusturma/guncelleme/silme (POST/PUT/DELETE "/api/v1/users/**")
+ *   sadece Keycloak'ta "admin" realm rolune sahip kullanicilar tarafindan cagrilabilir.
+ * - Proje/proje tipi/teknoloji/env olusturma/guncelleme/silme (POST/PUT/DELETE "/api/v1/projects/**",
+ *   "/api/v1/project-types/**", "/api/v1/technologies/**", "/api/v1/envs/**") de ayni sekilde sadece admin'e acik.
+ * - Kullanici okuma (GET "/api/v1/users/**") ve proje/proje tipi/teknoloji/env okuma (GET) gecerli
+ *   bir JWT'ye sahip herkese acik.
+ * - Yetkisiz erisimlerde 403 doner.
  *
  * "rs-grid.security.enabled=false" yapilarak (sadece local gelistirme icin) kapatilabilir.
  */
@@ -36,6 +51,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
         http.csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
         if (securityEnabled) {
@@ -44,6 +60,14 @@ public class SecurityConfig {
                             .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                             .requestMatchers("/api/v1/auth/**").permitAll()
                             .requestMatchers("/api/v1/groups/**").hasRole("admin")
+                            // Kullanici olusturma/guncelleme/silme sadece admin; okuma (GET) herkese acik.
+                            .requestMatchers(HttpMethod.POST, "/api/v1/users").hasRole("admin")
+                            .requestMatchers(HttpMethod.PUT, "/api/v1/users/**").hasRole("admin")
+                            .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasRole("admin")
+                            // Proje/proje tipi/teknoloji/env icin de ayni desen: yazma admin, okuma (GET) herkese acik.
+                            .requestMatchers(HttpMethod.POST, "/api/v1/projects", "/api/v1/project-types", "/api/v1/technologies", "/api/v1/envs").hasRole("admin")
+                            .requestMatchers(HttpMethod.PUT, "/api/v1/projects/**", "/api/v1/project-types/**", "/api/v1/technologies/**", "/api/v1/envs/**").hasRole("admin")
+                            .requestMatchers(HttpMethod.DELETE, "/api/v1/projects/**", "/api/v1/project-types/**", "/api/v1/technologies/**", "/api/v1/envs/**").hasRole("admin")
                             .anyRequest().authenticated())
                     .oauth2ResourceServer(oauth2 -> oauth2
                             .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
@@ -53,6 +77,24 @@ public class SecurityConfig {
         }
 
         return http.build();
+    }
+
+    /**
+     * Local gelistirme icin permissif CORS ayari: tarayicidan (file:// ile acilan bir HTML sayfasi
+     * ya da herhangi bir localhost portundan servis edilen bir frontend) dogrudan bu API'ye
+     * istek atilabilmesini saglar. Prod'da mutlaka spesifik origin'lerle degistirilmeli.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     private JwtAuthenticationConverter jwtAuthenticationConverter() {

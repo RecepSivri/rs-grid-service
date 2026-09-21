@@ -2,6 +2,7 @@ package com.rs.gridservice.controller;
 
 import com.rs.gridservice.dto.LoginRequest;
 import com.rs.gridservice.dto.LogoutRequest;
+import com.rs.gridservice.dto.RefreshRequest;
 import com.rs.gridservice.dto.TokenResponse;
 import com.rs.gridservice.service.AuthService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -29,6 +30,13 @@ public class AuthController {
     @SecurityRequirements
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    /** Refresh token ile yeni bir access token (+ genellikle yeni bir refresh token) al. */
+    @PostMapping("/refresh")
+    @SecurityRequirements
+    public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return ResponseEntity.ok(authService.refresh(request));
     }
 
     /** Refresh token'i gecersiz kilarak oturumu (session) sonlandir. */

@@ -26,6 +26,10 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        # "keycloak" kullanicisinin varsayilan search_path'i ("$user", public) "keycloak" adinda
+        # bir semaya da denk geldigi icin (Keycloak'in kendi verisini tasidigimiz sema), semasiz
+        # DDL/DML'ler yanlislikla oraya gidebiliyordu. Kendi tablolarimizi hep "public"e sabitliyoruz.
+        default_schema: public
 
 management:
   endpoints:

@@ -8,6 +8,7 @@ import org.keycloak.admin.client.KeycloakBuilder;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestClient;
 
 /**
  * Keycloak Admin REST API'sine (client_credentials grant ile) baglanacak
@@ -34,5 +35,11 @@ public class KeycloakAdminClientConfig {
                 .grantType(OAuth2Constants.CLIENT_CREDENTIALS)
                 .resteasyClient(resteasyClient)
                 .build();
+    }
+
+    /** KeycloakAuthServiceImpl'in Keycloak'in token/logout endpoint'lerine gitmek icin kullandigi client. */
+    @Bean
+    public RestClient keycloakTokenRestClient() {
+        return RestClient.create();
     }
 }

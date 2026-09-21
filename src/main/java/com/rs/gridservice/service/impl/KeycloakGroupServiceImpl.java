@@ -38,10 +38,15 @@ public class KeycloakGroupServiceImpl implements GroupService {
         }
     }
 
+    /**
+     * Keycloak'in GroupRepresentation#getSubGroups() metodu asla null donmez (subGroups alani
+     * null ise lazy olarak bos bir liste olusturup onu doner) - bu yuzden burada ekstra bir
+     * null kontrolune gerek yok, sadece subGroupCount alani doldurulmamis olabilir.
+     */
     private GroupResponse toResponse(GroupRepresentation representation) {
         Integer subGroupCount = representation.getSubGroupCount() != null
                 ? representation.getSubGroupCount().intValue()
-                : (representation.getSubGroups() != null ? representation.getSubGroups().size() : 0);
+                : representation.getSubGroups().size();
 
         return GroupResponse.builder()
                 .id(representation.getId())

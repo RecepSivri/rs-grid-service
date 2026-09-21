@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rs-grid-service Auth Test</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #262b36;
+    --text: #e6e8ec;
+    --muted: #8a90a2;
+    --accent: #5b8cff;
+    --accent-hover: #7aa0ff;
+    --ok: #3ecf8e;
+    --err: #ff6b6b;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ---- Login screen ---- */
+  .login-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .login-card {
+    width: 100%;
+    max-width: 360px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+  }
+  .login-card h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .login-card .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+
+  label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+  label:first-of-type { margin-top: 0; }
+  input {
+    width: 100%;
+    background: #0d0f14;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 9px 10px;
+    font-size: 14px;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: var(--accent-hover); }
+  button:disabled { background: #333844; color: #6b7080; cursor: not-allowed; }
+  button.secondary { background: #262b36; }
+  button.secondary:hover { background: #323847; }
+  button.danger { background: #3a2020; color: var(--err); }
+  button.danger:hover { background: #4a2828; }
+  button.small { padding: 7px 12px; font-size: 13px; }
+  button.full-width { width: 100%; margin-top: 18px; }
+
+  .msg { font-size: 13px; padding: 10px 12px; border-radius: 6px; margin-bottom: 16px; display: none; }
+  .msg.err { display: block; background: #2a1414; color: var(--err); border: 1px solid #4a2424; }
+  .msg.ok { display: block; background: #12261c; color: var(--ok); border: 1px solid #1e4230; }
+
+  /* ---- App screen ---- */
+  .app-screen { min-height: 100vh; display: flex; flex-direction: column; }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-left { font-size: 14px; font-weight: 600; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .topbar-right .username { font-size: 13px; color: var(--muted); }
+
+  /* ---- Sidebar + content layout ---- */
+  .body-layout { display: flex; align-items: stretch; flex: 1; }
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 16px 0;
+  }
+  .sidebar-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+    padding: 0 20px 10px;
+  }
+  .sidebar-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    color: var(--text);
+    border: none;
+    border-radius: 0;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .sidebar-item:hover { background: #1f2430; }
+  .sidebar-item.active {
+    background: #1c2333;
+    color: var(--accent-hover);
+    border-left: 3px solid var(--accent);
+    padding-left: 17px;
+  }
+
+  .content { flex: 1; max-width: 1000px; margin: 0 auto; padding: 24px 28px; width: 100%; }
+  .narrow { max-width: 480px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .status { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .kv { font-size: 12px; color: var(--muted); line-height: 1.8; margin-bottom: 14px; }
+  .kv b { color: var(--text); font-weight: 500; }
+  pre {
+    background: #0d0f14;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 220px;
+    overflow-y: auto;
+    color: #a9b1c3;
+    margin: 0;
+  }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 10px; }
+
+  select {
+    width: 100%;
+    background: #0d0f14;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 9px 10px;
+    font-size: 14px;
+  }
+  select:focus { outline: none; border-color: var(--accent); }
+  select:disabled { color: var(--muted); cursor: not-allowed; }
+  .row-inline { display: flex; gap: 16px; margin-top: 14px; }
+  .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin: 0; }
+  .checkbox-label input { width: auto; }
+  .panel-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .panel-subtitle { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+
+  /* ---- Users list table ---- */
+  .table-toolbar { display: flex; gap: 10px; margin-bottom: 14px; }
+  .table-toolbar input { flex: 1; }
+  .table-toolbar button { flex-shrink: 0; }
+  .table-wrap { overflow-x: auto; }
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data-table th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.data-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  table.data-table tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge.ok { background: #12261c; color: var(--ok); }
+  .badge.off { background: #2a1414; color: var(--err); }
+  .badge.neutral { background: #262b36; color: var(--muted); }
+  .table-actions { display: flex; gap: 6px; }
+  .table-actions button { padding: 5px 10px; font-size: 12px; }
+  .empty-row td { color: var(--muted); text-align: center; padding: 20px 10px; }
+
+  /* ---- Modal (edit / confirm) ---- */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 6, 10, .6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .modal-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px;
+  }
+  .modal-card h2 { font-size: 15px; margin: 0 0 4px; }
+  .modal-card .sub { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .modal-actions button { flex: 1; }
+</style>
+</head>
+<body>
+
+<!-- Giris ekrani: sadece login basarili olana kadar gorunur -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <h1>rs-grid-service</h1>
+    <div class="sub">Giriş yapın</div>
+    <div id="msg" class="msg"></div>
+
+    <label for="username">Kullanıcı adı</label>
+    <input id="username" autocomplete="username" placeholder="ahmet.yilmaz">
+
+    <label for="password">Şifre</label>
+    <input id="password" type="password" autocomplete="current-password" placeholder="••••••••">
+
+    <button id="loginBtn" class="full-width">Login</button>
+  </div>
+</div>
+
+<!-- Uygulama ekrani: login basarili olunca gosterilir, ustte logout iceren bar var -->
+<div id="appScreen" class="app-screen" style="display:none">
+  <div class="topbar">
+    <div class="topbar-left">rs-grid-service</div>
+    <div class="topbar-right">
+      <span id="topUsername" class="username"></span>
+      <button id="logoutBtn" class="danger small">Logout</button>
+    </div>
+  </div>
+
+  <div class="body-layout">
+    <!-- Sol menu: sadece "admin" rolune sahip kullanicilara gorunur -->
+    <div class="sidebar" id="sidebar" style="display:none">
+      <div class="sidebar-title">Yönetim</div>
+      <button class="sidebar-item active" id="navDashboard" data-view="dashboard">Genel Bakış</button>
+      <button class="sidebar-item" id="navUsers" data-view="users">Kullanıcı İşlemleri</button>
+    </div>
+
+    <div class="content">
+      <!-- Genel bakis: token durumu + yetkiler/gruplar -->
+      <div id="viewDashboard">
+        <div class="panel narrow">
+          <div class="status"><span class="dot"></span><span>Giriş yapıldı</span></div>
+          <div class="kv" id="tokenMeta"></div>
+          <button id="refreshBtn" class="secondary small">Refresh Token</button>
+          <div class="hint" id="autoRefreshHint"></div>
+        </div>
+
+        <div class="panel narrow">
+          <label style="margin-top:0">Yetkiler (realm rolleri)</label>
+          <div class="kv" id="rolesList">—</div>
+
+          <label>Gruplar</label>
+          <div class="kv" id="groupsList">—</div>
+        </div>
+      </div>
+
+      <!-- Kullanici islemleri: sadece "admin" rolune sahip kullanicilara gorunur -->
+      <div id="viewUsers" style="display:none">
+        <div class="panel narrow" id="createUserPanel">
+          <div class="panel-title">Yeni Kullanıcı Oluştur</div>
+          <div class="panel-subtitle">Bu bölüm sadece "admin" rolüne sahip kullanıcılara görünür</div>
+
+          <label style="margin-top:0">Kullanıcı adı *</label>
+          <input id="newUsername" placeholder="ahmet.yilmaz">
+
+          <label>Ad *</label>
+          <input id="newFirstName" placeholder="Ahmet">
+
+          <label>Soyad *</label>
+          <input id="newLastName" placeholder="Yılmaz">
+
+          <label>Email</label>
+          <input id="newEmail" type="email" placeholder="ahmet@example.com">
+
+          <label>Şifre</label>
+          <input id="newPassword" type="password" placeholder="İlk şifre">
+
+          <label>Kullanıcı Tipi (grup) *</label>
+          <select id="newUserType"><option value="">Yükleniyor…</option></select>
+
+          <div class="row-inline">
+            <label class="checkbox-label"><input type="checkbox" id="newEnabled" checked> Aktif</label>
+            <label class="checkbox-label"><input type="checkbox" id="newTemporaryPassword" checked> Geçici şifre</label>
+          </div>
+
+          <button id="createUserBtn" class="full-width">Kullanıcı Oluştur</button>
+          <div class="hint" id="createUserHint"></div>
+        </div>
+
+        <div class="panel" id="usersListPanel">
+          <div class="panel-title">Kullanıcılar</div>
+          <div class="panel-subtitle">Listeleme, düzenleme ve silme işlemleri buradan yapılır</div>
+
+          <div class="table-toolbar">
+            <input id="userSearch" placeholder="Kullanıcı adı veya email ile ara">
+            <button id="userSearchBtn" class="secondary small">Ara</button>
+            <button id="userRefreshBtn" class="secondary small">Yenile</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Kullanıcı Adı</th>
+                  <th>Ad Soyad</th>
+                  <th>Email</th>
+                  <th>Tip</th>
+                  <th>Durum</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <tr class="empty-row"><td colspan="6">Yükleniyor…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="hint" id="usersListHint"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <label style="margin-top:0">Son yanıt (ham)</label>
+        <pre id="rawOutput">—</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Kullanici duzenleme modali -->
+<div id="editUserModal" class="modal-overlay" style="display:none">
+  <div class="modal-card">
+    <h2>Kullanıcıyı Düzenle</h2>
+    <div class="sub" id="editUserSub"></div>
+
+    <label style="margin-top:0">Ad</label>
+    <input id="editFirstName">
+
+    <label>Soyad</label>
+    <input id="editLastName">
+
+    <label>Email</label>
+    <input id="editEmail" type="email">
+
+    <label>Kullanıcı Tipi</label>
+    <select id="editUserType" disabled></select>
+    <div class="hint">Kullanıcı tipi değişikliği şu an backend'de desteklenmiyor (sadece kullanıcı oluşturulurken atanabiliyor).</div>
+
+    <label>Yeni Şifre (opsiyonel)</label>
+    <input id="editPassword" type="password" placeholder="Boş bırakılırsa değişmez">
+
+    <div class="row-inline">
+      <label class="checkbox-label"><input type="checkbox" id="editEnabled"> Aktif</label>
+      <label class="checkbox-label"><input type="checkbox" id="editTemporaryPassword" checked> Geçici şifre</label>
+    </div>
+
+    <div class="hint" id="editUserHint"></div>
+    <div class="modal-actions">
+      <button id="editCancelBtn" class="secondary">Vazgeç</button>
+      <button id="editSaveBtn">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Genel amacli onay modali (orn. silme onayi) -->
+<div id="confirmModal" class="modal-overlay" style="display:none">
+  <div class="modal-card">
+    <h2 id="confirmTitle">Emin misiniz?</h2>
+    <div class="sub" id="confirmMessage"></div>
+    <div class="modal-actions">
+      <button id="confirmCancelBtn" class="secondary">Vazgeç</button>
+      <button id="confirmOkBtn" class="danger">Evet, Sil</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // API adresi sabit: farkli bir ortamda calistirmak icin bu satiri degistirin.
+  const API_BASE_URL = "http://localhost:8081";
+
+  const STORAGE_KEY = "rs_grid_auth_tokens";
+
+  const els = {
+    loginScreen: document.getElementById("loginScreen"),
+    appScreen: document.getElementById("appScreen"),
+    username: document.getElementById("username"),
+    password: document.getElementById("password"),
+    loginBtn: document.getElementById("loginBtn"),
+    refreshBtn: document.getElementById("refreshBtn"),
+    logoutBtn: document.getElementById("logoutBtn"),
+    topUsername: document.getElementById("topUsername"),
+    tokenMeta: document.getElementById("tokenMeta"),
+    rawOutput: document.getElementById("rawOutput"),
+    msg: document.getElementById("msg"),
+    autoRefreshHint: document.getElementById("autoRefreshHint"),
+    rolesList: document.getElementById("rolesList"),
+    groupsList: document.getElementById("groupsList"),
+
+    sidebar: document.getElementById("sidebar"),
+    navDashboard: document.getElementById("navDashboard"),
+    navUsers: document.getElementById("navUsers"),
+    viewDashboard: document.getElementById("viewDashboard"),
+    viewUsers: document.getElementById("viewUsers"),
+
+    newUsername: document.getElementById("newUsername"),
+    newFirstName: document.getElementById("newFirstName"),
+    newLastName: document.getElementById("newLastName"),
+    newEmail: document.getElementById("newEmail"),
+    newPassword: document.getElementById("newPassword"),
+    newUserType: document.getElementById("newUserType"),
+    newEnabled: document.getElementById("newEnabled"),
+    newTemporaryPassword: document.getElementById("newTemporaryPassword"),
+    createUserBtn: document.getElementById("createUserBtn"),
+    createUserHint: document.getElementById("createUserHint"),
+
+    userSearch: document.getElementById("userSearch"),
+    userSearchBtn: document.getElementById("userSearchBtn"),
+    userRefreshBtn: document.getElementById("userRefreshBtn"),
+    usersTableBody: document.getElementById("usersTableBody"),
+    usersListHint: document.getElementById("usersListHint"),
+
+    editUserModal: document.getElementById("editUserModal"),
+    editUserSub: document.getElementById("editUserSub"),
+    editFirstName: document.getElementById("editFirstName"),
+    editLastName: document.getElementById("editLastName"),
+    editEmail: document.getElementById("editEmail"),
+    editUserType: document.getElementById("editUserType"),
+    editPassword: document.getElementById("editPassword"),
+    editEnabled: document.getElementById("editEnabled"),
+    editTemporaryPassword: document.getElementById("editTemporaryPassword"),
+    editUserHint: document.getElementById("editUserHint"),
+    editCancelBtn: document.getElementById("editCancelBtn"),
+    editSaveBtn: document.getElementById("editSaveBtn"),
+
+    confirmModal: document.getElementById("confirmModal"),
+    confirmTitle: document.getElementById("confirmTitle"),
+    confirmMessage: document.getElementById("confirmMessage"),
+    confirmCancelBtn: document.getElementById("confirmCancelBtn"),
+    confirmOkBtn: document.getElementById("confirmOkBtn"),
+  };
+
+  /**
+   * JWT'nin payload kismini (imza dogrulamadan, sadece goruntulemek icin) cozer.
+   * access_token zaten backend'den JWT olarak geliyor; realm_access.roles claim'i
+   * backend'de de (KeycloakRealmRoleConverter) ayni sekilde okunuyor.
+   */
+  function decodeJwtPayload(token) {
+    try {
+      const payload = token.split(".")[1];
+      const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+      const binary = atob(padded);
+      const percentEncoded = Array.from(binary)
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join("");
+      return JSON.parse(decodeURIComponent(percentEncoded));
+    } catch (e) {
+      console.warn("JWT decode edilemedi:", e);
+      return null;
+    }
+  }
+
+  let state = null;          // { accessToken, refreshToken, expiresAt, refreshExpiresAt, username, roles, groups }
+  let autoRefreshTimer = null;
+  let countdownTimer = null;
+  let userTypesLoaded = false;
+  let currentView = "dashboard";
+  let editingUserId = null;
+
+  function showMessage(text, isError) {
+    els.msg.textContent = text;
+    els.msg.className = "msg " + (isError ? "err" : "ok");
+  }
+
+  function clearMessage() {
+    els.msg.className = "msg";
+    els.msg.textContent = "";
+  }
+
+  function showRaw(obj) {
+    els.rawOutput.textContent = JSON.stringify(obj, null, 2);
+  }
+
+  /**
+   * @param {string} method - "GET", "POST", "PUT", "DELETE"
+   * @param {string} path - orn. "/api/v1/auth/login"
+   * @param {object|null} body - JSON govde, GET icin null gecin
+   * @param {boolean} useAuth - true ise Authorization: Bearer <accessToken> header'i eklenir
+   *   (login/refresh/logout haric butun endpoint'ler icin gerekli)
+   */
+  async function apiRequest(method, path, body, useAuth) {
+    const headers = { "Content-Type": "application/json" };
+    if (useAuth) {
+      if (!state || !state.accessToken) {
+        throw new Error("Oturum yok, önce giriş yapmalısınız");
+      }
+      headers["Authorization"] = "Bearer " + state.accessToken;
+    }
+    const res = await fetch(API_BASE_URL + path, {
+      method,
+      headers,
+      body: body != null ? JSON.stringify(body) : undefined,
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) { /* bos govde (orn. logout/delete 204) olabilir */ }
+    if (!res.ok) {
+      const message = (data && data.message) ? data.message : ("HTTP " + res.status);
+      throw new Error(message);
+    }
+    return data;
+  }
+
+  function persist() {
+    if (state) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }
+
+  function restore() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.refreshExpiresAt && parsed.refreshExpiresAt > Date.now()) {
+          state = parsed;
+          return;
+        }
+      }
+    } catch (e) { /* bozuk veri, yok say */ }
+    state = null;
+  }
+
+  function setTokensFromResponse(tokenResponse, username) {
+    const now = Date.now();
+    const claims = decodeJwtPayload(tokenResponse.access_token);
+
+    // realm_access.roles: backend'de KeycloakRealmRoleConverter'in okudugu ayni claim.
+    const roles = (claims && claims.realm_access && Array.isArray(claims.realm_access.roles))
+      ? claims.realm_access.roles
+      : [];
+
+    // "groups" claim'i Keycloak'ta varsayilan olarak tokende bulunmaz; client'ta
+    // "group membership" protocol mapper eklenmisse gelir. Yoksa null birakiyoruz
+    // ki arayuzde "tokende yok" mesaji gosterebilelim (bunu backend degisikligi
+    // olmadan baska turlu ogrenemeyiz).
+    const groups = (claims && Array.isArray(claims.groups)) ? claims.groups : null;
+
+    state = {
+      accessToken: tokenResponse.access_token,
+      refreshToken: tokenResponse.refresh_token,
+      expiresAt: now + (tokenResponse.expires_in * 1000),
+      refreshExpiresAt: now + (tokenResponse.refresh_expires_in * 1000),
+      username: (claims && claims.preferred_username) || username || (state && state.username) || null,
+      roles: roles,
+      groups: groups,
+    };
+    persist();
+  }
+
+  function clearState() {
+    state = null;
+    persist();
+    if (autoRefreshTimer) clearTimeout(autoRefreshTimer);
+    if (countdownTimer) clearInterval(countdownTimer);
+    userTypesLoaded = false;
+    switchView("dashboard");
+  }
+
+  function scheduleAutoRefresh() {
+    if (autoRefreshTimer) clearTimeout(autoRefreshTimer);
+    if (!state) return;
+    const msUntilRefresh = Math.max(state.expiresAt - Date.now() - 30000, 2000);
+    autoRefreshTimer = setTimeout(() => {
+      doRefresh().catch((e) => {
+        // Refresh de basarisiz olduysa (orn. refresh token da suresi dolmus) oturumu kapat.
+        clearState();
+        renderScreen();
+        showLoginScreen();
+        showMessage("Oturum süresi doldu, tekrar giriş yapın (" + e.message + ")", true);
+      });
+    }, msUntilRefresh);
+  }
+
+  function showLoginScreen() {
+    els.loginScreen.style.display = "flex";
+    els.appScreen.style.display = "none";
+    els.password.value = "";
+  }
+
+  function showAppScreen() {
+    els.loginScreen.style.display = "none";
+    els.appScreen.style.display = "flex";
+    clearMessage();
+  }
+
+  function renderScreen() {
+    const loggedIn = !!state;
+
+    if (loggedIn) {
+      els.topUsername.textContent = state.username || "";
+      showAppScreen();
+
+      if (countdownTimer) clearInterval(countdownTimer);
+      const updateMeta = () => {
+        const secLeft = Math.max(0, Math.round((state.expiresAt - Date.now()) / 1000));
+        const refreshSecLeft = Math.max(0, Math.round((state.refreshExpiresAt - Date.now()) / 1000));
+        els.tokenMeta.innerHTML =
+          "<div><b>access_token</b> süresi doluyor: " + secLeft + " sn</div>" +
+          "<div><b>refresh_token</b> süresi doluyor: " + refreshSecLeft + " sn</div>";
+      };
+      updateMeta();
+      countdownTimer = setInterval(updateMeta, 1000);
+      els.autoRefreshHint.textContent = "Access token süresi dolmadan ~30sn önce otomatik yenilenecek.";
+
+      renderRolesAndGroups();
+    } else {
+      showLoginScreen();
+    }
+  }
+
+  function renderRolesAndGroups() {
+    const roles = (state && state.roles) || [];
+    els.rolesList.textContent = roles.length ? roles.join(", ") : "(bu kullanıcıya atanmış realm rolü yok)";
+
+    if (!state || state.groups === null) {
+      els.groupsList.textContent =
+        "Token içinde grup bilgisi yok — Keycloak client'ınızda \"group membership\" protocol mapper'ı eklenmemiş.";
+    } else if (state.groups.length === 0) {
+      els.groupsList.textContent = "(bu kullanıcı hiçbir gruba üye değil)";
+    } else {
+      els.groupsList.textContent = state.groups.join(", ");
+    }
+
+    updateAdminVisibility();
+  }
+
+  /** "admin" rolu olan kullanicilara sol menuyu goster, digerlerinden gizle. */
+  function updateAdminVisibility() {
+    const isAdmin = !!(state && state.roles && state.roles.includes("admin"));
+    els.sidebar.style.display = isAdmin ? "block" : "none";
+    if (isAdmin) {
+      if (!userTypesLoaded) loadUserTypes();
+    } else if (currentView !== "dashboard") {
+      switchView("dashboard");
+    }
+  }
+
+  /** Sol menudeki gorunumler arasinda gecis yapar (Genel Bakis / Kullanici Islemleri). */
+  function switchView(view) {
+    currentView = view;
+    els.viewDashboard.style.display = view === "dashboard" ? "block" : "none";
+    els.viewUsers.style.display = view === "users" ? "block" : "none";
+    els.navDashboard.classList.toggle("active", view === "dashboard");
+    els.navUsers.classList.toggle("active", view === "users");
+    if (view === "users") {
+      loadUsers();
+    }
+  }
+
+  /** Kullanici Tipi dropdown'unu /api/v1/groups API'sinden (admin yetkisiyle) doldurur. */
+  async function loadUserTypes() {
+    els.newUserType.innerHTML = "";
+    els.newUserType.appendChild(makeOption("", "Yükleniyor…"));
+    try {
+      const groups = await apiRequest("GET", "/api/v1/groups", null, true);
+      els.newUserType.innerHTML = "";
+      if (!groups.length) {
+        els.newUserType.appendChild(makeOption("", "(grup bulunamadı)"));
+      } else {
+        groups.forEach((g) => els.newUserType.appendChild(makeOption(g.name, g.name)));
+      }
+      userTypesLoaded = true;
+    } catch (e) {
+      els.newUserType.innerHTML = "";
+      els.newUserType.appendChild(makeOption("", "Gruplar yüklenemedi"));
+      showMessage("Gruplar yüklenemedi: " + e.message, true);
+    }
+  }
+
+  function makeOption(value, label) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    return opt;
+  }
+
+  async function doCreateUser() {
+    const username = els.newUsername.value.trim();
+    const firstName = els.newFirstName.value.trim();
+    const lastName = els.newLastName.value.trim();
+    const userType = els.newUserType.value;
+
+    if (!username || !firstName || !lastName || !userType) {
+      setCreateUserHint("Kullanıcı adı, ad, soyad ve kullanıcı tipi zorunlu", true);
+      return;
+    }
+
+    const payload = {
+      username,
+      firstName,
+      lastName,
+      userType,
+      enabled: els.newEnabled.checked,
+      temporaryPassword: els.newTemporaryPassword.checked,
+    };
+    const email = els.newEmail.value.trim();
+    const password = els.newPassword.value;
+    if (email) payload.email = email;
+    if (password) payload.password = password;
+
+    els.createUserBtn.disabled = true;
+    setCreateUserHint("", false);
+    try {
+      const created = await apiRequest("POST", "/api/v1/users", payload, true);
+      showRaw(created);
+      setCreateUserHint("Oluşturuldu: " + created.username, false);
+      els.newUsername.value = "";
+      els.newFirstName.value = "";
+      els.newLastName.value = "";
+      els.newEmail.value = "";
+      els.newPassword.value = "";
+      loadUsers();
+    } catch (e) {
+      setCreateUserHint("Hata: " + e.message, true);
+    } finally {
+      els.createUserBtn.disabled = false;
+    }
+  }
+
+  function setCreateUserHint(text, isError) {
+    els.createUserHint.textContent = text;
+    els.createUserHint.style.color = isError ? "var(--err)" : "var(--ok)";
+  }
+
+  /* ---- Kullanici listesi (grid) ---- */
+
+  function td(content) {
+    const cell = document.createElement("td");
+    if (content instanceof Node) {
+      cell.appendChild(content);
+    } else {
+      cell.textContent = content;
+    }
+    return cell;
+  }
+
+  function userTypeBadge(userType) {
+    const span = document.createElement("span");
+    span.className = "badge neutral";
+    span.textContent = userType || "—";
+    return span;
+  }
+
+  function statusBadge(enabled) {
+    const span = document.createElement("span");
+    span.className = "badge " + (enabled ? "ok" : "off");
+    span.textContent = enabled ? "Aktif" : "Pasif";
+    return span;
+  }
+
+  function buildUserRow(user) {
+    const tr = document.createElement("tr");
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "—";
+
+    tr.appendChild(td(user.username || "—"));
+    tr.appendChild(td(fullName));
+    tr.appendChild(td(user.email || "—"));
+    tr.appendChild(td(userTypeBadge(user.userType)));
+    tr.appendChild(td(statusBadge(!!user.enabled)));
+
+    const actions = document.createElement("div");
+    actions.className = "table-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "secondary small";
+    editBtn.textContent = "Düzenle";
+    editBtn.addEventListener("click", () => openEditModal(user));
+    actions.appendChild(editBtn);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "danger small";
+    deleteBtn.textContent = "Sil";
+    deleteBtn.addEventListener("click", () => confirmDeleteUser(user));
+    actions.appendChild(deleteBtn);
+
+    tr.appendChild(td(actions));
+    return tr;
+  }
+
+  function renderUsersTable(users) {
+    els.usersTableBody.innerHTML = "";
+    if (!users.length) {
+      const tr = document.createElement("tr");
+      tr.className = "empty-row";
+      const cell = document.createElement("td");
+      cell.colSpan = 6;
+      cell.textContent = "Kullanıcı bulunamadı";
+      tr.appendChild(cell);
+      els.usersTableBody.appendChild(tr);
+      return;
+    }
+    users.forEach((user) => els.usersTableBody.appendChild(buildUserRow(user)));
+  }
+
+  async function loadUsers() {
+    const search = els.userSearch.value.trim();
+    els.usersListHint.textContent = "";
+    els.usersTableBody.innerHTML = "";
+    const loadingRow = document.createElement("tr");
+    loadingRow.className = "empty-row";
+    const loadingCell = document.createElement("td");
+    loadingCell.colSpan = 6;
+    loadingCell.textContent = "Yükleniyor…";
+    loadingRow.appendChild(loadingCell);
+    els.usersTableBody.appendChild(loadingRow);
+
+    try {
+      const path = "/api/v1/users?first=0&max=200" + (search ? "&search=" + encodeURIComponent(search) : "");
+      const users = await apiRequest("GET", path, null, true);
+      showRaw(users);
+      renderUsersTable(users);
+    } catch (e) {
+      els.usersTableBody.innerHTML = "";
+      els.usersListHint.textContent = "Liste yüklenemedi: " + e.message;
+      els.usersListHint.style.color = "var(--err)";
+    }
+  }
+
+  /* ---- Kullanici duzenleme modali ---- */
+
+  function openEditModal(user) {
+    editingUserId = user.id;
+    els.editUserSub.textContent = user.username || "";
+    els.editFirstName.value = user.firstName || "";
+    els.editLastName.value = user.lastName || "";
+    els.editEmail.value = user.email || "";
+    els.editEnabled.checked = !!user.enabled;
+    els.editPassword.value = "";
+    els.editTemporaryPassword.checked = true;
+    els.editUserType.innerHTML = "";
+    els.editUserType.appendChild(makeOption(user.userType || "", user.userType || "—"));
+    els.editUserHint.textContent = "";
+    els.editUserModal.style.display = "flex";
+  }
+
+  function closeEditModal() {
+    editingUserId = null;
+    els.editUserModal.style.display = "none";
+  }
+
+  async function doSaveEditUser() {
+    if (!editingUserId) return;
+
+    const payload = {
+      firstName: els.editFirstName.value.trim(),
+      lastName: els.editLastName.value.trim(),
+      email: els.editEmail.value.trim(),
+      enabled: els.editEnabled.checked,
+    };
+    const password = els.editPassword.value;
+    if (password) {
+      payload.password = password;
+      payload.temporaryPassword = els.editTemporaryPassword.checked;
+    }
+
+    els.editSaveBtn.disabled = true;
+    els.editUserHint.textContent = "";
+    try {
+      await apiRequest("PUT", "/api/v1/users/" + encodeURIComponent(editingUserId), payload, true);
+      closeEditModal();
+      loadUsers();
+    } catch (e) {
+      els.editUserHint.textContent = "Hata: " + e.message;
+      els.editUserHint.style.color = "var(--err)";
+    } finally {
+      els.editSaveBtn.disabled = false;
+    }
+  }
+
+  /* ---- Genel amacli onay modali ---- */
+
+  let confirmResolve = null;
+
+  function showConfirm(title, message) {
+    els.confirmTitle.textContent = title;
+    els.confirmMessage.textContent = message;
+    els.confirmModal.style.display = "flex";
+    return new Promise((resolve) => {
+      confirmResolve = resolve;
+    });
+  }
+
+  function resolveConfirm(result) {
+    els.confirmModal.style.display = "none";
+    if (confirmResolve) {
+      confirmResolve(result);
+      confirmResolve = null;
+    }
+  }
+
+  async function confirmDeleteUser(user) {
+    const ok = await showConfirm(
+      "Kullanıcıyı Sil",
+      "\"" + (user.username || user.id) + "\" kullanıcısını silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
+    );
+    if (!ok) return;
+    try {
+      await apiRequest("DELETE", "/api/v1/users/" + encodeURIComponent(user.id), null, true);
+      loadUsers();
+    } catch (e) {
+      els.usersListHint.textContent = "Silme başarısız: " + e.message;
+      els.usersListHint.style.color = "var(--err)";
+    }
+  }
+
+  async function doLogin() {
+    const username = els.username.value.trim();
+    const password = els.password.value;
+    if (!username || !password) {
+      showMessage("Kullanıcı adı ve şifre gerekli", true);
+      return;
+    }
+    clearMessage();
+    els.loginBtn.disabled = true;
+    try {
+      const data = await apiRequest("POST", "/api/v1/auth/login", { username, password }, false);
+      showRaw(data);
+      setTokensFromResponse(data, username);
+      renderScreen();
+      scheduleAutoRefresh();
+    } catch (e) {
+      showMessage("Giriş başarısız: " + e.message, true);
+    } finally {
+      els.loginBtn.disabled = false;
+    }
+  }
+
+  async function doRefresh() {
+    if (!state || !state.refreshToken) return;
+    const data = await apiRequest("POST", "/api/v1/auth/refresh", { refreshToken: state.refreshToken }, false);
+    showRaw(data);
+    setTokensFromResponse(data);
+    renderScreen();
+    scheduleAutoRefresh();
+  }
+
+  async function doLogout() {
+    if (state && state.refreshToken) {
+      els.logoutBtn.disabled = true;
+      try {
+        await apiRequest("POST", "/api/v1/auth/logout", { refreshToken: state.refreshToken }, false);
+      } catch (e) {
+        // Backend tarafinda refresh token zaten gecersiz olsa bile local oturumu temizliyoruz.
+        console.warn("Logout isteği hata döndü, yine de local oturum temizleniyor:", e.message);
+      } finally {
+        els.logoutBtn.disabled = false;
+      }
+    }
+    clearState();
+    els.username.value = "";
+    showRaw({});
+    renderScreen();
+  }
+
+  els.loginBtn.addEventListener("click", doLogin);
+  els.password.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+  els.refreshBtn.addEventListener("click", () => {
+    doRefresh().catch((e) => showMessage("Yenileme başarısız: " + e.message, true));
+  });
+  els.logoutBtn.addEventListener("click", doLogout);
+  els.createUserBtn.addEventListener("click", doCreateUser);
+
+  els.navDashboard.addEventListener("click", () => switchView("dashboard"));
+  els.navUsers.addEventListener("click", () => switchView("users"));
+  els.userRefreshBtn.addEventListener("click", loadUsers);
+  els.userSearchBtn.addEventListener("click", loadUsers);
+  els.userSearch.addEventListener("keydown", (e) => { if (e.key === "Enter") loadUsers(); });
+
+  els.editCancelBtn.addEventListener("click", closeEditModal);
+  els.editSaveBtn.addEventListener("click", doSaveEditUser);
+  els.confirmCancelBtn.addEventListener("click", () => resolveConfirm(false));
+  els.confirmOkBtn.addEventListener("click", () => resolveConfirm(true));
+
+  restore();
+  renderScreen();
+  if (state) scheduleAutoRefresh();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "rs-grid-service-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "rs-grid-service auth test sayfasi icin bagimliliksiz static server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
