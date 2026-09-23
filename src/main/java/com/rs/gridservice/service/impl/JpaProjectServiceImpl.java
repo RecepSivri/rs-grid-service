@@ -51,13 +51,15 @@ public class JpaProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    public List<ProjectResponse> getAllProjects(int first, int max, String search) {
+    public List<ProjectResponse> getAllProjects(String userId, int first, int max, String search) {
         boolean hasSearch = search != null && !search.isBlank();
         String jpql = hasSearch
-                ? "SELECT p FROM ProjectEntity p WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) ORDER BY p.name"
-                : "SELECT p FROM ProjectEntity p ORDER BY p.name";
+                ? "SELECT p FROM ProjectEntity p WHERE p.userId = :userId "
+                        + "AND LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) ORDER BY p.name"
+                : "SELECT p FROM ProjectEntity p WHERE p.userId = :userId ORDER BY p.name";
 
         TypedQuery<ProjectEntity> query = entityManager.createQuery(jpql, ProjectEntity.class)
+                .setParameter("userId", userId)
                 .setFirstResult(first)
                 .setMaxResults(max);
         if (hasSearch) {
@@ -68,9 +70,8 @@ public class JpaProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    public ProjectResponse editProject(String projectId, ProjectUpdateRequest request) {
-        ProjectEntity entity = projectRepository.findById(projectId)
-                .orElseThrow(() -> new ResourceNotFoundException("Proje bulunamadi: id=" + projectId));
+    public ProjectResponse editProject(String projectId, String userId, ProjectUpdateRequest request) {
+        ProjectEntity entity = findOwnedProject(projectId, userId);
 
         if (request.getName() != null) {
             entity.setName(request.getName());
@@ -91,12 +92,17 @@ public class JpaProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    public void deleteProject(String projectId) {
-        if (!projectRepository.existsById(projectId)) {
-            throw new ResourceNotFoundException("Proje bulunamadi: id=" + projectId);
-        }
-        projectRepository.deleteById(projectId);
+    public void deleteProject(String projectId, String userId) {
+        ProjectEntity entity = findOwnedProject(projectId, userId);
+        projectRepository.delete(entity);
         log.info("Proje silindi: id={}", projectId);
+    }
+
+    /** Projeyi bulur ve gercekten userId'ye ait oldugunu dogrular; degilse "bulunamadi" ile aynen davranir. */
+    private ProjectEntity findOwnedProject(String projectId, String userId) {
+        return projectRepository.findById(projectId)
+                .filter(entity -> entity.getUserId().equals(userId))
+                .orElseThrow(() -> new ResourceNotFoundException("Proje bulunamadi: id=" + projectId));
     }
 
     private ProjectResponse toResponse(ProjectEntity entity) {

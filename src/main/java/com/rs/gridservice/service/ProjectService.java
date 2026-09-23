@@ -12,9 +12,12 @@ public interface ProjectService {
 
     ProjectResponse getProject(String projectId);
 
-    List<ProjectResponse> getAllProjects(int first, int max, String search);
+    /** userId'ye ait projeleri listeler. */
+    List<ProjectResponse> getAllProjects(String userId, int first, int max, String search);
 
-    ProjectResponse editProject(String projectId, ProjectUpdateRequest request);
+    /** Sadece projenin sahibi (userId) guncelleyebilir; baskasina aitse "bulunamadi" hatasi doner. */
+    ProjectResponse editProject(String projectId, String userId, ProjectUpdateRequest request);
 
-    void deleteProject(String projectId);
+    /** Sadece projenin sahibi (userId) silebilir; baskasina aitse "bulunamadi" hatasi doner. */
+    void deleteProject(String projectId, String userId);
 }

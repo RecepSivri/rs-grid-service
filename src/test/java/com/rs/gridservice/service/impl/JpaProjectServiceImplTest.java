@@ -8,6 +8,7 @@ import com.rs.gridservice.exception.ResourceNotFoundException;
 import com.rs.gridservice.repository.ProjectRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -41,13 +42,13 @@ class JpaProjectServiceImplTest {
 
     private JpaProjectServiceImpl service;
 
-    @org.junit.jupiter.api.BeforeEach
+    @BeforeEach
     void setUp() {
         service = new JpaProjectServiceImpl(projectRepository, entityManager);
         lenient().when(entityManager.createQuery(anyString(), eq(ProjectEntity.class))).thenReturn(typedQuery);
+        lenient().when(typedQuery.setParameter(anyString(), any())).thenReturn(typedQuery);
         lenient().when(typedQuery.setFirstResult(anyInt())).thenReturn(typedQuery);
         lenient().when(typedQuery.setMaxResults(anyInt())).thenReturn(typedQuery);
-        lenient().when(typedQuery.setParameter(anyString(), any())).thenReturn(typedQuery);
     }
 
     private ProjectEntity sampleEntity() {
@@ -100,31 +101,34 @@ class JpaProjectServiceImplTest {
     }
 
     @Test
-    void getAllProjectsWithoutSearchSkipsParameterBinding() {
+    void getAllProjectsFiltersByUserIdWithoutSearch() {
         when(typedQuery.getResultList()).thenReturn(List.of(sampleEntity()));
 
-        List<ProjectResponse> response = service.getAllProjects(0, 50, null);
+        List<ProjectResponse> response = service.getAllProjects("user-1", 0, 50, null);
 
         assertThat(response).hasSize(1);
-        verify(typedQuery, never()).setParameter(anyString(), any());
+        verify(typedQuery).setParameter("userId", "user-1");
+        verify(typedQuery, never()).setParameter(eq("search"), any());
     }
 
     @Test
-    void getAllProjectsWithBlankSearchSkipsParameterBinding() {
+    void getAllProjectsWithBlankSearchSkipsSearchParameterBinding() {
         when(typedQuery.getResultList()).thenReturn(List.of());
 
-        service.getAllProjects(0, 50, "   ");
+        service.getAllProjects("user-1", 0, 50, "   ");
 
-        verify(typedQuery, never()).setParameter(anyString(), any());
+        verify(typedQuery).setParameter("userId", "user-1");
+        verify(typedQuery, never()).setParameter(eq("search"), any());
     }
 
     @Test
-    void getAllProjectsWithSearchBindsParameter() {
+    void getAllProjectsWithSearchBindsBothParameters() {
         when(typedQuery.getResultList()).thenReturn(List.of(sampleEntity()));
 
-        List<ProjectResponse> response = service.getAllProjects(0, 50, "grid");
+        List<ProjectResponse> response = service.getAllProjects("user-1", 0, 50, "grid");
 
         assertThat(response).hasSize(1);
+        verify(typedQuery, times(1)).setParameter("userId", "user-1");
         verify(typedQuery, times(1)).setParameter("search", "grid");
     }
 
@@ -137,7 +141,7 @@ class JpaProjectServiceImplTest {
         ProjectUpdateRequest request = new ProjectUpdateRequest();
         request.setTechnology("Kotlin");
 
-        ProjectResponse response = service.editProject("project-1", request);
+        ProjectResponse response = service.editProject("project-1", "user-1", request);
 
         assertThat(response.getTechnology()).isEqualTo("Kotlin");
         assertThat(response.getName()).isEqualTo("Grid Dashboard");
@@ -154,7 +158,7 @@ class JpaProjectServiceImplTest {
         ProjectUpdateRequest request = new ProjectUpdateRequest();
         request.setName("Sadece Isim Degisti");
 
-        ProjectResponse response = service.editProject("project-1", request);
+        ProjectResponse response = service.editProject("project-1", "user-1", request);
 
         assertThat(response.getName()).isEqualTo("Sadece Isim Degisti");
         assertThat(response.getTechnology()).isEqualTo("React");
@@ -174,7 +178,7 @@ class JpaProjectServiceImplTest {
         request.setTechnology("Vue");
         request.setType("mobile");
 
-        ProjectResponse response = service.editProject("project-1", request);
+        ProjectResponse response = service.editProject("project-1", "user-1", request);
 
         assertThat(response.getName()).isEqualTo("Yeni Isim");
         assertThat(response.getUserId()).isEqualTo("user-2");
@@ -186,25 +190,45 @@ class JpaProjectServiceImplTest {
     void editProjectThrowsNotFoundWhenMissing() {
         when(projectRepository.findById("missing")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.editProject("missing", new ProjectUpdateRequest()))
+        assertThatThrownBy(() -> service.editProject("missing", "user-1", new ProjectUpdateRequest()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
-    void deleteProjectRemovesWhenExists() {
-        when(projectRepository.existsById("project-1")).thenReturn(true);
+    void editProjectThrowsNotFoundWhenOwnedByDifferentUser() {
+        when(projectRepository.findById("project-1")).thenReturn(Optional.of(sampleEntity()));
 
-        service.deleteProject("project-1");
+        assertThatThrownBy(() -> service.editProject("project-1", "someone-else", new ProjectUpdateRequest()))
+                .isInstanceOf(ResourceNotFoundException.class);
 
-        verify(projectRepository).deleteById("project-1");
+        verify(projectRepository, never()).save(any());
+    }
+
+    @Test
+    void deleteProjectRemovesWhenOwnedByGivenUser() {
+        ProjectEntity existing = sampleEntity();
+        when(projectRepository.findById("project-1")).thenReturn(Optional.of(existing));
+
+        service.deleteProject("project-1", "user-1");
+
+        verify(projectRepository).delete(existing);
     }
 
     @Test
     void deleteProjectThrowsNotFoundWhenMissing() {
-        when(projectRepository.existsById("missing")).thenReturn(false);
+        when(projectRepository.findById("missing")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.deleteProject("missing"))
+        assertThatThrownBy(() -> service.deleteProject("missing", "user-1"))
                 .isInstanceOf(ResourceNotFoundException.class);
-        verify(projectRepository, never()).deleteById(anyString());
+        verify(projectRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteProjectThrowsNotFoundWhenOwnedByDifferentUser() {
+        when(projectRepository.findById("project-1")).thenReturn(Optional.of(sampleEntity()));
+
+        assertThatThrownBy(() -> service.deleteProject("project-1", "someone-else"))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(projectRepository, never()).delete(any());
     }
 }

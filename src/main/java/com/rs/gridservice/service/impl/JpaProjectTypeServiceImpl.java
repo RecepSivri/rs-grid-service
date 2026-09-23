@@ -5,6 +5,7 @@ import com.rs.gridservice.dto.ProjectTypeResponse;
 import com.rs.gridservice.dto.ProjectTypeUpdateRequest;
 import com.rs.gridservice.entity.ProjectTypeEntity;
 import com.rs.gridservice.exception.ResourceNotFoundException;
+import com.rs.gridservice.repository.ProjectRepository;
 import com.rs.gridservice.repository.ProjectTypeRepository;
 import com.rs.gridservice.service.ProjectTypeService;
 import jakarta.persistence.EntityManager;
@@ -12,6 +13,7 @@ import jakarta.persistence.TypedQuery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,6 +28,7 @@ import java.util.UUID;
 public class JpaProjectTypeServiceImpl implements ProjectTypeService {
 
     private final ProjectTypeRepository projectTypeRepository;
+    private final ProjectRepository projectRepository;
     private final EntityManager entityManager;
 
     @Override
@@ -64,14 +67,25 @@ public class JpaProjectTypeServiceImpl implements ProjectTypeService {
         return query.getResultList().stream().map(this::toResponse).toList();
     }
 
+    /**
+     * Isim degistiyse, bu ProjectType'i zaten kullanan projelerin type alanini
+     * da (salt bir isim kopyasi oldugu icin, bkz. ProjectRepository) ayni
+     * islemde gunceller -- yoksa mevcut projeler eski isimde takili kalir.
+     */
     @Override
+    @Transactional
     public ProjectTypeResponse editProjectType(String projectTypeId, ProjectTypeUpdateRequest request) {
         ProjectTypeEntity entity = projectTypeRepository.findById(projectTypeId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectType bulunamadi: id=" + projectTypeId));
 
+        String oldName = entity.getName();
         entity.setName(request.getName());
 
         ProjectTypeEntity saved = projectTypeRepository.save(entity);
+        if (!oldName.equals(request.getName())) {
+            int updatedProjects = projectRepository.renameTypeReferences(oldName, request.getName());
+            log.info("ProjectType adi degisti: id={}, {} projede type guncellendi", projectTypeId, updatedProjects);
+        }
         log.info("ProjectType guncellendi: id={}", projectTypeId);
         return toResponse(saved);
     }

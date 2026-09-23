@@ -51,13 +51,15 @@ public class JpaEnvServiceImpl implements EnvService {
     }
 
     @Override
-    public List<EnvResponse> getAllEnvs(int first, int max, String search) {
+    public List<EnvResponse> getAllEnvs(String userId, int first, int max, String search) {
         boolean hasSearch = search != null && !search.isBlank();
         String jpql = hasSearch
-                ? "SELECT e FROM EnvEntity e WHERE LOWER(e.name) LIKE LOWER(CONCAT('%', :search, '%')) ORDER BY e.name"
-                : "SELECT e FROM EnvEntity e ORDER BY e.name";
+                ? "SELECT e FROM EnvEntity e WHERE e.userId = :userId "
+                        + "AND LOWER(e.name) LIKE LOWER(CONCAT('%', :search, '%')) ORDER BY e.name"
+                : "SELECT e FROM EnvEntity e WHERE e.userId = :userId ORDER BY e.name";
 
         TypedQuery<EnvEntity> query = entityManager.createQuery(jpql, EnvEntity.class)
+                .setParameter("userId", userId)
                 .setFirstResult(first)
                 .setMaxResults(max);
         if (hasSearch) {
@@ -68,9 +70,8 @@ public class JpaEnvServiceImpl implements EnvService {
     }
 
     @Override
-    public EnvResponse editEnv(String envId, EnvUpdateRequest request) {
-        EnvEntity entity = envRepository.findById(envId)
-                .orElseThrow(() -> new ResourceNotFoundException("Env bulunamadi: id=" + envId));
+    public EnvResponse editEnv(String envId, String userId, EnvUpdateRequest request) {
+        EnvEntity entity = findOwnedEnv(envId, userId);
 
         if (request.getName() != null) {
             entity.setName(request.getName());
@@ -88,12 +89,17 @@ public class JpaEnvServiceImpl implements EnvService {
     }
 
     @Override
-    public void deleteEnv(String envId) {
-        if (!envRepository.existsById(envId)) {
-            throw new ResourceNotFoundException("Env bulunamadi: id=" + envId);
-        }
-        envRepository.deleteById(envId);
+    public void deleteEnv(String envId, String userId) {
+        EnvEntity entity = findOwnedEnv(envId, userId);
+        envRepository.delete(entity);
         log.info("Env silindi: id={}", envId);
+    }
+
+    /** Kaydi bulur ve gercekten userId'ye ait oldugunu dogrular; degilse "bulunamadi" ile aynen davranir. */
+    private EnvEntity findOwnedEnv(String envId, String userId) {
+        return envRepository.findById(envId)
+                .filter(entity -> entity.getUserId().equals(userId))
+                .orElseThrow(() -> new ResourceNotFoundException("Env bulunamadi: id=" + envId));
     }
 
     private EnvResponse toResponse(EnvEntity entity) {

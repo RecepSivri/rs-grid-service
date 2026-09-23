@@ -11,6 +11,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 
 import java.lang.reflect.Method;
 import java.util.HashSet;
@@ -87,6 +88,15 @@ class GlobalExceptionHandlerTest {
         ResponseEntity<ApiError> response = handler.handleValidation(ex);
 
         assertThat(response.getBody().fieldErrors()).containsEntry("username", "ilk hata");
+    }
+
+    @Test
+    void handlesMissingRequestParameter() {
+        ResponseEntity<ApiError> response = handler.handleMissingParameter(
+                new MissingServletRequestParameterException("userId", "String"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).contains("userId").contains("zorunlu");
     }
 
     @Test

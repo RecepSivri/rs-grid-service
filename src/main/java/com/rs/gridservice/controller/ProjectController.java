@@ -36,27 +36,31 @@ public class ProjectController {
         return ResponseEntity.ok(projectService.getProject(projectId));
     }
 
-    /** Tum projeleri listele, opsiyonel sayfalama ve isme gore arama (getAll). */
+    /** userId'ye ait projeleri listele, opsiyonel sayfalama ve isme gore arama (getAll). */
     @GetMapping
     public ResponseEntity<List<ProjectResponse>> getAllProjects(
+            @RequestParam String userId,
             @RequestParam(defaultValue = "0") int first,
             @RequestParam(defaultValue = "50") int max,
             @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(projectService.getAllProjects(first, max, search));
+        return ResponseEntity.ok(projectService.getAllProjects(userId, first, max, search));
     }
 
-    /** Projeyi guncelle (edit). */
+    /** Projeyi guncelle (edit); sadece projenin sahibi (userId) guncelleyebilir. */
     @PutMapping("/{projectId}")
     public ResponseEntity<ProjectResponse> editProject(
             @PathVariable String projectId,
+            @RequestParam String userId,
             @Valid @RequestBody ProjectUpdateRequest request) {
-        return ResponseEntity.ok(projectService.editProject(projectId, request));
+        return ResponseEntity.ok(projectService.editProject(projectId, userId, request));
     }
 
-    /** Projeyi sil (delete). */
+    /** Projeyi sil (delete); sadece projenin sahibi (userId) silebilir. */
     @DeleteMapping("/{projectId}")
-    public ResponseEntity<Void> deleteProject(@PathVariable String projectId) {
-        projectService.deleteProject(projectId);
+    public ResponseEntity<Void> deleteProject(
+            @PathVariable String projectId,
+            @RequestParam String userId) {
+        projectService.deleteProject(projectId, userId);
         return ResponseEntity.noContent().build();
     }
 }

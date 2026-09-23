@@ -31,12 +31,18 @@ import java.util.List;
  * authority'lerine ("ROLE_<rol>") cevrilir.
  *
  * Yetkilendirme kurallari:
- * - "/api/v1/groups/**" ve kullanici olusturma/guncelleme/silme (POST/PUT/DELETE "/api/v1/users/**")
- *   sadece Keycloak'ta "admin" realm rolune sahip kullanicilar tarafindan cagrilabilir.
- * - Proje/proje tipi/teknoloji/env olusturma/guncelleme/silme (POST/PUT/DELETE "/api/v1/projects/**",
- *   "/api/v1/project-types/**", "/api/v1/technologies/**", "/api/v1/envs/**") de ayni sekilde sadece admin'e acik.
- * - Kullanici okuma (GET "/api/v1/users/**") ve proje/proje tipi/teknoloji/env okuma (GET) gecerli
- *   bir JWT'ye sahip herkese acik.
+ * - "/api/v1/groups/**", kullanici olusturma/guncelleme/silme (POST/PUT/DELETE "/api/v1/users/**")
+ *   ve proje tipi/teknoloji'nin TUM metodlari (okuma dahil, "/api/v1/project-types/**",
+ *   "/api/v1/technologies/**") sadece Keycloak'ta "admin" realm rolune sahip kullanicilar
+ *   tarafindan cagrilabilir -- bunlar referans/lookup verisi, normal kullanicinin gormesine gerek yok.
+ *   Istisna: teknoloji listeleme (GET "/api/v1/technologies", getAll) "desktop_user" rolune de acik
+ *   -- teknoloji tek getirme/ekleme/guncelleme/silme yine sadece admin'e ozel.
+ * - Proje, env ve page ("/api/v1/projects/**", "/api/v1/envs/**", "/api/v1/pages/**"): TUM metodlar
+ *   (okuma dahil) sadece "admin" ya da "desktop_user" realm rolune sahip kullanicilar tarafindan
+ *   cagrilabilir. Ayrica sahiplik servis katmaninda userId eslesmesiyle zorunlu kilinir (bkz.
+ *   JpaProjectServiceImpl/JpaEnvServiceImpl/JpaPageServiceImpl), yani bu rollerden birine sahip bir
+ *   kullanici bile sadece kendi kaydini duzenleyebilir/silebilir.
+ * - Kullanici okuma (GET "/api/v1/users/**") gecerli bir JWT'ye sahip herkese acik.
  * - Yetkisiz erisimlerde 403 doner.
  *
  * "rs-grid.security.enabled=false" yapilarak (sadece local gelistirme icin) kapatilabilir.
@@ -64,10 +70,21 @@ public class SecurityConfig {
                             .requestMatchers(HttpMethod.POST, "/api/v1/users").hasRole("admin")
                             .requestMatchers(HttpMethod.PUT, "/api/v1/users/**").hasRole("admin")
                             .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasRole("admin")
-                            // Proje/proje tipi/teknoloji/env icin de ayni desen: yazma admin, okuma (GET) herkese acik.
-                            .requestMatchers(HttpMethod.POST, "/api/v1/projects", "/api/v1/project-types", "/api/v1/technologies", "/api/v1/envs").hasRole("admin")
-                            .requestMatchers(HttpMethod.PUT, "/api/v1/projects/**", "/api/v1/project-types/**", "/api/v1/technologies/**", "/api/v1/envs/**").hasRole("admin")
-                            .requestMatchers(HttpMethod.DELETE, "/api/v1/projects/**", "/api/v1/project-types/**", "/api/v1/technologies/**", "/api/v1/envs/**").hasRole("admin")
+                            // Proje tipi/teknoloji: tamamen admin'e ozel (okuma dahil) -- referans/lookup
+                            // verisi, normal kullanicinin gormesine gerek yok.
+                            .requestMatchers(HttpMethod.GET, "/api/v1/project-types").hasAnyRole("admin", "desktop_user")
+                            .requestMatchers("/api/v1/project-types", "/api/v1/project-types/**").hasRole("admin")
+                            // Teknoloji listeleme (getAll) istisnasi: desktop_user de cagirabilir; digerleri (tek
+                            // getirme, ekleme, guncelleme, silme) admin'e ozel kalir. Daha spesifik oldugu icin
+                            // genel "/api/v1/technologies/**" kuralindan ONCE tanimlanmali.
+                            .requestMatchers(HttpMethod.GET, "/api/v1/technologies").hasAnyRole("admin", "desktop_user")
+                            .requestMatchers("/api/v1/technologies", "/api/v1/technologies/**").hasRole("admin")
+                            // Proje/env/page: admin veya desktop_user rolune sahip kullanicilar TUM CRUD
+                            // islemlerini yapabilir; sahiplik kontrolu (userId eslesmesi) ayrica servis
+                            // katmaninda uygulanir (bkz. JpaProjectServiceImpl/JpaEnvServiceImpl/JpaPageServiceImpl).
+                            .requestMatchers("/api/v1/projects", "/api/v1/projects/**", "/api/v1/envs", "/api/v1/envs/**",
+                                    "/api/v1/pages", "/api/v1/pages/**")
+                            .hasAnyRole("admin", "desktop_user")
                             .anyRequest().authenticated())
                     .oauth2ResourceServer(oauth2 -> oauth2
                             .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
@@ -109,7 +126,7 @@ public class SecurityConfig {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             ApiError body = new ApiError(HttpServletResponse.SC_FORBIDDEN, "Forbidden",
-                    "Bu islemi yapmaya yetkiniz yok (admin rolu gerekli)");
+                    "Bu islemi yapmaya yetkiniz yok");
             objectMapper.writeValue(response.getWriter(), body);
         };
     }

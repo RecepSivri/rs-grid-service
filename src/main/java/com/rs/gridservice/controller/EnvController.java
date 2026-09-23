@@ -36,27 +36,31 @@ public class EnvController {
         return ResponseEntity.ok(envService.getEnv(envId));
     }
 
-    /** Tum env kayitlarini listele, opsiyonel sayfalama ve isme gore arama (getAll). */
+    /** userId'ye ait env kayitlarini listele, opsiyonel sayfalama ve isme gore arama (getAll). */
     @GetMapping
     public ResponseEntity<List<EnvResponse>> getAllEnvs(
+            @RequestParam String userId,
             @RequestParam(defaultValue = "0") int first,
             @RequestParam(defaultValue = "50") int max,
             @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(envService.getAllEnvs(first, max, search));
+        return ResponseEntity.ok(envService.getAllEnvs(userId, first, max, search));
     }
 
-    /** Env kaydini guncelle (edit). */
+    /** Env kaydini guncelle (edit); sadece kaydin sahibi (userId) guncelleyebilir. */
     @PutMapping("/{envId}")
     public ResponseEntity<EnvResponse> editEnv(
             @PathVariable String envId,
+            @RequestParam String userId,
             @Valid @RequestBody EnvUpdateRequest request) {
-        return ResponseEntity.ok(envService.editEnv(envId, request));
+        return ResponseEntity.ok(envService.editEnv(envId, userId, request));
     }
 
-    /** Env kaydini sil (delete). */
+    /** Env kaydini sil (delete); sadece kaydin sahibi (userId) silebilir. */
     @DeleteMapping("/{envId}")
-    public ResponseEntity<Void> deleteEnv(@PathVariable String envId) {
-        envService.deleteEnv(envId);
+    public ResponseEntity<Void> deleteEnv(
+            @PathVariable String envId,
+            @RequestParam String userId) {
+        envService.deleteEnv(envId, userId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -71,6 +71,8 @@ class SecurityConfigEnabledIntegrationTest {
     private ProjectTypeService projectTypeService;
     @MockBean
     private EnvService envService;
+    @MockBean
+    private com.rs.gridservice.service.PageService pageService;
 
     private String url(String path) {
         return "http://localhost:" + port + path;
@@ -130,7 +132,7 @@ class SecurityConfigEnabledIntegrationTest {
                 new HttpEntity<>(headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(response.getBody()).contains("\"status\":403").contains("admin rolu gerekli");
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
     }
 
     @Test
@@ -148,32 +150,65 @@ class SecurityConfigEnabledIntegrationTest {
     }
 
     @Test
-    void projectsReadWithoutAdminRoleIsAuthorized() {
-        when(projectService.getAllProjects(0, 50, null)).thenReturn(List.of());
+    void projectsReadWithoutRequiredRoleReturnsForbidden() {
         when(jwtDecoder.decode("plain-user-token")).thenReturn(jwtWithRealmRoles("plain-user-token", List.of("offline_access")));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth("plain-user-token");
 
-        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/projects"), HttpMethod.GET,
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/projects?userId=user-1"), HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
+    }
+
+    @Test
+    void projectsReadWithUserDesktopRoleIsAuthorized() {
+        when(projectService.getAllProjects("user-1", 0, 50, null)).thenReturn(List.of());
+        when(jwtDecoder.decode("user-desktop-token")).thenReturn(jwtWithRealmRoles("user-desktop-token", List.of("desktop_user")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("user-desktop-token");
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/projects?userId=user-1"), HttpMethod.GET,
                 new HttpEntity<>(headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
-    void projectsWriteWithoutAdminRoleReturnsForbidden() {
-        when(jwtDecoder.decode("non-admin-token")).thenReturn(jwtWithRealmRoles("non-admin-token", List.of("offline_access")));
+    void projectsWriteWithoutRequiredRoleReturnsForbidden() {
+        when(jwtDecoder.decode("plain-user-token")).thenReturn(jwtWithRealmRoles("plain-user-token", List.of("offline_access")));
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth("non-admin-token");
+        headers.setBearerAuth("plain-user-token");
         headers.setContentType(MediaType.APPLICATION_JSON);
+        String body = "{\"name\":\"Grid Dashboard\",\"userId\":\"user-1\",\"technology\":\"React\",\"type\":\"web\"}";
 
         ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/projects"), HttpMethod.POST,
-                new HttpEntity<>("{}", headers), String.class);
+                new HttpEntity<>(body, headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(response.getBody()).contains("\"status\":403").contains("admin rolu gerekli");
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
+    }
+
+    @Test
+    void projectsWriteWithUserDesktopRoleIsAuthorized() {
+        ProjectResponse created = ProjectResponse.builder().id("project-1").name("Grid Dashboard")
+                .userId("user-1").technology("React").type("web").build();
+        when(projectService.addProject(any())).thenReturn(created);
+        when(jwtDecoder.decode("user-desktop-token")).thenReturn(jwtWithRealmRoles("user-desktop-token", List.of("desktop_user")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("user-desktop-token");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String body = "{\"name\":\"Grid Dashboard\",\"userId\":\"user-1\",\"technology\":\"React\",\"type\":\"web\"}";
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/projects"), HttpMethod.POST,
+                new HttpEntity<>(body, headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
     @Test
@@ -206,7 +241,64 @@ class SecurityConfigEnabledIntegrationTest {
                 new HttpEntity<>("{}", headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(response.getBody()).contains("\"status\":403").contains("admin rolu gerekli");
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
+    }
+
+    @Test
+    void technologiesReadWithoutAdminRoleReturnsForbidden() {
+        when(jwtDecoder.decode("non-admin-token")).thenReturn(jwtWithRealmRoles("non-admin-token", List.of("offline_access")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("non-admin-token");
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/technologies"), HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
+    }
+
+    @Test
+    void technologiesGetAllWithDesktopUserRoleIsAuthorized() {
+        when(technologyService.getAllTechnologies(0, 50, null)).thenReturn(List.of());
+        when(jwtDecoder.decode("desktop-user-token")).thenReturn(jwtWithRealmRoles("desktop-user-token", List.of("desktop_user")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("desktop-user-token");
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/technologies"), HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void technologiesGetSingleWithDesktopUserRoleReturnsForbidden() {
+        when(jwtDecoder.decode("desktop-user-token")).thenReturn(jwtWithRealmRoles("desktop-user-token", List.of("desktop_user")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("desktop-user-token");
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/technologies/tech-1"), HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
+    }
+
+    @Test
+    void technologiesWriteWithDesktopUserRoleReturnsForbidden() {
+        when(jwtDecoder.decode("desktop-user-token")).thenReturn(jwtWithRealmRoles("desktop-user-token", List.of("desktop_user")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("desktop-user-token");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/technologies"), HttpMethod.POST,
+                new HttpEntity<>("{}", headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
     }
 
     @Test
@@ -221,36 +313,97 @@ class SecurityConfigEnabledIntegrationTest {
                 new HttpEntity<>("{}", headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(response.getBody()).contains("\"status\":403").contains("admin rolu gerekli");
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
     }
 
     @Test
-    void envsReadWithoutAdminRoleIsAuthorized() {
-        when(envService.getAllEnvs(0, 50, null)).thenReturn(List.of());
+    void projectTypesReadWithoutAdminRoleReturnsForbidden() {
+        when(jwtDecoder.decode("non-admin-token")).thenReturn(jwtWithRealmRoles("non-admin-token", List.of("offline_access")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("non-admin-token");
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/project-types"), HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
+    }
+
+    @Test
+    void envsReadWithoutRequiredRoleReturnsForbidden() {
         when(jwtDecoder.decode("plain-user-token")).thenReturn(jwtWithRealmRoles("plain-user-token", List.of("offline_access")));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth("plain-user-token");
 
-        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/envs"), HttpMethod.GET,
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/envs?userId=user-1"), HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
+    }
+
+    @Test
+    void envsReadWithUserDesktopRoleIsAuthorized() {
+        when(envService.getAllEnvs("user-1", 0, 50, null)).thenReturn(List.of());
+        when(jwtDecoder.decode("user-desktop-token")).thenReturn(jwtWithRealmRoles("user-desktop-token", List.of("desktop_user")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("user-desktop-token");
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/envs?userId=user-1"), HttpMethod.GET,
                 new HttpEntity<>(headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
-    void envsWriteWithoutAdminRoleReturnsForbidden() {
-        when(jwtDecoder.decode("non-admin-token")).thenReturn(jwtWithRealmRoles("non-admin-token", List.of("offline_access")));
+    void envsReadWithoutUserIdReturnsBadRequest() {
+        when(jwtDecoder.decode("user-desktop-token")).thenReturn(jwtWithRealmRoles("user-desktop-token", List.of("desktop_user")));
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth("non-admin-token");
+        headers.setBearerAuth("user-desktop-token");
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/envs"), HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).contains("userId").contains("zorunlu");
+    }
+
+    @Test
+    void envsWriteWithoutRequiredRoleReturnsForbidden() {
+        when(jwtDecoder.decode("plain-user-token")).thenReturn(jwtWithRealmRoles("plain-user-token", List.of("offline_access")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("plain-user-token");
         headers.setContentType(MediaType.APPLICATION_JSON);
+        String body = "{\"name\":\"Local Dev\",\"url\":\"http://localhost:5500\",\"userId\":\"user-1\"}";
 
         ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/envs"), HttpMethod.POST,
-                new HttpEntity<>("{}", headers), String.class);
+                new HttpEntity<>(body, headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(response.getBody()).contains("\"status\":403").contains("admin rolu gerekli");
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
+    }
+
+    @Test
+    void envsWriteWithUserDesktopRoleIsAuthorized() {
+        com.rs.gridservice.dto.EnvResponse created = com.rs.gridservice.dto.EnvResponse.builder()
+                .id("env-1").name("Local Dev").url("http://localhost:5500").userId("user-1").build();
+        when(envService.addEnv(any())).thenReturn(created);
+        when(jwtDecoder.decode("user-desktop-token")).thenReturn(jwtWithRealmRoles("user-desktop-token", List.of("desktop_user")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("user-desktop-token");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String body = "{\"name\":\"Local Dev\",\"url\":\"http://localhost:5500\",\"userId\":\"user-1\"}";
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/envs"), HttpMethod.POST,
+                new HttpEntity<>(body, headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
     @Test
@@ -266,6 +419,86 @@ class SecurityConfigEnabledIntegrationTest {
         String body = "{\"name\":\"Local Dev\",\"url\":\"http://localhost:5500\",\"userId\":\"user-1\"}";
 
         ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/envs"), HttpMethod.POST,
+                new HttpEntity<>(body, headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    void pagesReadWithoutRequiredRoleReturnsForbidden() {
+        when(jwtDecoder.decode("plain-user-token")).thenReturn(jwtWithRealmRoles("plain-user-token", List.of("offline_access")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("plain-user-token");
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/pages?projectId=project-1&userId=user-1"), HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
+    }
+
+    @Test
+    void pagesReadWithUserDesktopRoleIsAuthorized() {
+        when(pageService.getAllPages("project-1", "user-1", 0, 50, null)).thenReturn(List.of());
+        when(jwtDecoder.decode("user-desktop-token")).thenReturn(jwtWithRealmRoles("user-desktop-token", List.of("desktop_user")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("user-desktop-token");
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/pages?projectId=project-1&userId=user-1"), HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void pagesWriteWithoutRequiredRoleReturnsForbidden() {
+        when(jwtDecoder.decode("plain-user-token")).thenReturn(jwtWithRealmRoles("plain-user-token", List.of("offline_access")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("plain-user-token");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String body = "{\"projectId\":\"project-1\",\"userId\":\"user-1\",\"name\":\"Kullanicilar\"}";
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/pages"), HttpMethod.POST,
+                new HttpEntity<>(body, headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
+    }
+
+    @Test
+    void pagesWriteWithUserDesktopRoleIsAuthorized() {
+        com.rs.gridservice.dto.PageResponse created = com.rs.gridservice.dto.PageResponse.builder()
+                .id("page-1").projectId("project-1").userId("user-1").name("Kullanicilar").build();
+        when(pageService.addPage(any())).thenReturn(created);
+        when(jwtDecoder.decode("user-desktop-token")).thenReturn(jwtWithRealmRoles("user-desktop-token", List.of("desktop_user")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("user-desktop-token");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String body = "{\"projectId\":\"project-1\",\"userId\":\"user-1\",\"name\":\"Kullanicilar\"}";
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/pages"), HttpMethod.POST,
+                new HttpEntity<>(body, headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    void pagesWriteWithAdminRoleIsAuthorized() {
+        com.rs.gridservice.dto.PageResponse created = com.rs.gridservice.dto.PageResponse.builder()
+                .id("page-1").projectId("project-1").userId("user-1").name("Kullanicilar").build();
+        when(pageService.addPage(any())).thenReturn(created);
+        when(jwtDecoder.decode("admin-token")).thenReturn(jwtWithRealmRoles("admin-token", List.of("admin")));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth("admin-token");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String body = "{\"projectId\":\"project-1\",\"userId\":\"user-1\",\"name\":\"Kullanicilar\"}";
+
+        ResponseEntity<String> response = restTemplate.exchange(url("/api/v1/pages"), HttpMethod.POST,
                 new HttpEntity<>(body, headers), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);

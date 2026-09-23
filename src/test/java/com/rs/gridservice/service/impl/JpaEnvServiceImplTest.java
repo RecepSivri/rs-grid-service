@@ -46,9 +46,9 @@ class JpaEnvServiceImplTest {
     void setUp() {
         service = new JpaEnvServiceImpl(envRepository, entityManager);
         lenient().when(entityManager.createQuery(anyString(), eq(EnvEntity.class))).thenReturn(typedQuery);
+        lenient().when(typedQuery.setParameter(anyString(), any())).thenReturn(typedQuery);
         lenient().when(typedQuery.setFirstResult(anyInt())).thenReturn(typedQuery);
         lenient().when(typedQuery.setMaxResults(anyInt())).thenReturn(typedQuery);
-        lenient().when(typedQuery.setParameter(anyString(), any())).thenReturn(typedQuery);
     }
 
     private EnvEntity sampleEntity() {
@@ -94,31 +94,34 @@ class JpaEnvServiceImplTest {
     }
 
     @Test
-    void getAllEnvsWithoutSearchSkipsParameterBinding() {
+    void getAllEnvsFiltersByUserIdWithoutSearch() {
         when(typedQuery.getResultList()).thenReturn(List.of(sampleEntity()));
 
-        List<EnvResponse> response = service.getAllEnvs(0, 50, null);
+        List<EnvResponse> response = service.getAllEnvs("user-1", 0, 50, null);
 
         assertThat(response).hasSize(1);
-        verify(typedQuery, never()).setParameter(anyString(), any());
+        verify(typedQuery).setParameter("userId", "user-1");
+        verify(typedQuery, never()).setParameter(eq("search"), any());
     }
 
     @Test
-    void getAllEnvsWithBlankSearchSkipsParameterBinding() {
+    void getAllEnvsWithBlankSearchSkipsSearchParameterBinding() {
         when(typedQuery.getResultList()).thenReturn(List.of());
 
-        service.getAllEnvs(0, 50, "   ");
+        service.getAllEnvs("user-1", 0, 50, "   ");
 
-        verify(typedQuery, never()).setParameter(anyString(), any());
+        verify(typedQuery).setParameter("userId", "user-1");
+        verify(typedQuery, never()).setParameter(eq("search"), any());
     }
 
     @Test
-    void getAllEnvsWithSearchBindsParameter() {
+    void getAllEnvsWithSearchBindsBothParameters() {
         when(typedQuery.getResultList()).thenReturn(List.of(sampleEntity()));
 
-        List<EnvResponse> response = service.getAllEnvs(0, 50, "local");
+        List<EnvResponse> response = service.getAllEnvs("user-1", 0, 50, "local");
 
         assertThat(response).hasSize(1);
+        verify(typedQuery, times(1)).setParameter("userId", "user-1");
         verify(typedQuery, times(1)).setParameter("search", "local");
     }
 
@@ -131,7 +134,7 @@ class JpaEnvServiceImplTest {
         EnvUpdateRequest request = new EnvUpdateRequest();
         request.setName("Local Dev v2");
 
-        EnvResponse response = service.editEnv("env-1", request);
+        EnvResponse response = service.editEnv("env-1", "user-1", request);
 
         assertThat(response.getName()).isEqualTo("Local Dev v2");
         assertThat(response.getUrl()).isEqualTo("http://localhost:5500");
@@ -147,7 +150,7 @@ class JpaEnvServiceImplTest {
         EnvUpdateRequest request = new EnvUpdateRequest();
         request.setUrl("http://localhost:6000");
 
-        EnvResponse response = service.editEnv("env-1", request);
+        EnvResponse response = service.editEnv("env-1", "user-1", request);
 
         assertThat(response.getUrl()).isEqualTo("http://localhost:6000");
         assertThat(response.getName()).isEqualTo("Local Dev");
@@ -155,7 +158,7 @@ class JpaEnvServiceImplTest {
     }
 
     @Test
-    void editEnvWithOnlyUserIdLeavesOthersUnset() {
+    void editEnvWithOnlyUserIdTransfersOwnership() {
         EnvEntity existing = sampleEntity();
         when(envRepository.findById("env-1")).thenReturn(Optional.of(existing));
         when(envRepository.save(existing)).thenReturn(existing);
@@ -163,7 +166,7 @@ class JpaEnvServiceImplTest {
         EnvUpdateRequest request = new EnvUpdateRequest();
         request.setUserId("user-2");
 
-        EnvResponse response = service.editEnv("env-1", request);
+        EnvResponse response = service.editEnv("env-1", "user-1", request);
 
         assertThat(response.getUserId()).isEqualTo("user-2");
         assertThat(response.getName()).isEqualTo("Local Dev");
@@ -181,7 +184,7 @@ class JpaEnvServiceImplTest {
         request.setUrl("http://localhost:7000");
         request.setUserId("user-2");
 
-        EnvResponse response = service.editEnv("env-1", request);
+        EnvResponse response = service.editEnv("env-1", "user-1", request);
 
         assertThat(response.getName()).isEqualTo("Prod");
         assertThat(response.getUrl()).isEqualTo("http://localhost:7000");
@@ -192,25 +195,45 @@ class JpaEnvServiceImplTest {
     void editEnvThrowsNotFoundWhenMissing() {
         when(envRepository.findById("missing")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.editEnv("missing", new EnvUpdateRequest()))
+        assertThatThrownBy(() -> service.editEnv("missing", "user-1", new EnvUpdateRequest()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
-    void deleteEnvRemovesWhenExists() {
-        when(envRepository.existsById("env-1")).thenReturn(true);
+    void editEnvThrowsNotFoundWhenOwnedByDifferentUser() {
+        when(envRepository.findById("env-1")).thenReturn(Optional.of(sampleEntity()));
 
-        service.deleteEnv("env-1");
+        assertThatThrownBy(() -> service.editEnv("env-1", "someone-else", new EnvUpdateRequest()))
+                .isInstanceOf(ResourceNotFoundException.class);
 
-        verify(envRepository).deleteById("env-1");
+        verify(envRepository, never()).save(any());
+    }
+
+    @Test
+    void deleteEnvRemovesWhenOwnedByGivenUser() {
+        EnvEntity existing = sampleEntity();
+        when(envRepository.findById("env-1")).thenReturn(Optional.of(existing));
+
+        service.deleteEnv("env-1", "user-1");
+
+        verify(envRepository).delete(existing);
     }
 
     @Test
     void deleteEnvThrowsNotFoundWhenMissing() {
-        when(envRepository.existsById("missing")).thenReturn(false);
+        when(envRepository.findById("missing")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.deleteEnv("missing"))
+        assertThatThrownBy(() -> service.deleteEnv("missing", "user-1"))
                 .isInstanceOf(ResourceNotFoundException.class);
-        verify(envRepository, never()).deleteById(anyString());
+        verify(envRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteEnvThrowsNotFoundWhenOwnedByDifferentUser() {
+        when(envRepository.findById("env-1")).thenReturn(Optional.of(sampleEntity()));
+
+        assertThatThrownBy(() -> service.deleteEnv("env-1", "someone-else"))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(envRepository, never()).delete(any());
     }
 }

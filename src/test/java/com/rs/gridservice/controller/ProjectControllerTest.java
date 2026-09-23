@@ -56,11 +56,11 @@ class ProjectControllerTest {
     }
 
     @Test
-    void getAllProjectsDelegatesPagingAndSearchToService() {
+    void getAllProjectsDelegatesUserIdPagingAndSearchToService() {
         List<ProjectResponse> projects = List.of(ProjectResponse.builder().id("project-1").build());
-        when(projectService.getAllProjects(0, 50, "grid")).thenReturn(projects);
+        when(projectService.getAllProjects("user-1", 0, 50, "grid")).thenReturn(projects);
 
-        ResponseEntity<List<ProjectResponse>> response = projectController.getAllProjects(0, 50, "grid");
+        ResponseEntity<List<ProjectResponse>> response = projectController.getAllProjects("user-1", 0, 50, "grid");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isSameAs(projects);
@@ -71,9 +71,9 @@ class ProjectControllerTest {
         ProjectUpdateRequest request = new ProjectUpdateRequest();
         request.setTechnology("Kotlin");
         ProjectResponse updated = ProjectResponse.builder().id("project-1").technology("Kotlin").build();
-        when(projectService.editProject("project-1", request)).thenReturn(updated);
+        when(projectService.editProject("project-1", "user-1", request)).thenReturn(updated);
 
-        ResponseEntity<ProjectResponse> response = projectController.editProject("project-1", request);
+        ResponseEntity<ProjectResponse> response = projectController.editProject("project-1", "user-1", request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isSameAs(updated);
@@ -81,9 +81,9 @@ class ProjectControllerTest {
 
     @Test
     void deleteProjectReturnsNoContentAndDelegatesToService() {
-        ResponseEntity<Void> response = projectController.deleteProject("project-1");
+        ResponseEntity<Void> response = projectController.deleteProject("project-1", "user-1");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        verify(projectService).deleteProject("project-1");
+        verify(projectService).deleteProject("project-1", "user-1");
     }
 }

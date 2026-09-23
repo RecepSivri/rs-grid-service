@@ -5,6 +5,7 @@ import com.rs.gridservice.dto.TechnologyResponse;
 import com.rs.gridservice.dto.TechnologyUpdateRequest;
 import com.rs.gridservice.entity.TechnologyEntity;
 import com.rs.gridservice.exception.ResourceNotFoundException;
+import com.rs.gridservice.repository.ProjectRepository;
 import com.rs.gridservice.repository.TechnologyRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
@@ -36,6 +37,8 @@ class JpaTechnologyServiceImplTest {
     @Mock
     private TechnologyRepository technologyRepository;
     @Mock
+    private ProjectRepository projectRepository;
+    @Mock
     private EntityManager entityManager;
     @Mock
     private TypedQuery<TechnologyEntity> typedQuery;
@@ -44,7 +47,7 @@ class JpaTechnologyServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new JpaTechnologyServiceImpl(technologyRepository, entityManager);
+        service = new JpaTechnologyServiceImpl(technologyRepository, projectRepository, entityManager);
         lenient().when(entityManager.createQuery(anyString(), eq(TechnologyEntity.class))).thenReturn(typedQuery);
         lenient().when(typedQuery.setFirstResult(anyInt())).thenReturn(typedQuery);
         lenient().when(typedQuery.setMaxResults(anyInt())).thenReturn(typedQuery);
@@ -128,6 +131,36 @@ class JpaTechnologyServiceImplTest {
         TechnologyResponse response = service.editTechnology("tech-1", request);
 
         assertThat(response.getName()).isEqualTo("Vue.js");
+    }
+
+    @Test
+    void editTechnologyWithChangedNameCascadesRenameToExistingProjects() {
+        TechnologyEntity existing = sampleEntity(); // name = "React"
+        when(technologyRepository.findById("tech-1")).thenReturn(Optional.of(existing));
+        when(technologyRepository.save(existing)).thenReturn(existing);
+
+        TechnologyUpdateRequest request = new TechnologyUpdateRequest();
+        request.setName("React.js");
+
+        service.editTechnology("tech-1", request);
+
+        // Project.technology bir FK degil, isim kopyasi -- rename olunca zaten
+        // bu ismi kullanan projelerin de guncellenmesi gerekir.
+        verify(projectRepository).renameTechnologyReferences("React", "React.js");
+    }
+
+    @Test
+    void editTechnologyWithUnchangedNameDoesNotCascadeRename() {
+        TechnologyEntity existing = sampleEntity(); // name = "React"
+        when(technologyRepository.findById("tech-1")).thenReturn(Optional.of(existing));
+        when(technologyRepository.save(existing)).thenReturn(existing);
+
+        TechnologyUpdateRequest request = new TechnologyUpdateRequest();
+        request.setName("React"); // same name -- e.g. only re-saving other fields in the future
+
+        service.editTechnology("tech-1", request);
+
+        verify(projectRepository, never()).renameTechnologyReferences(anyString(), anyString());
     }
 
     @Test

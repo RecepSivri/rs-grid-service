@@ -12,9 +12,12 @@ public interface EnvService {
 
     EnvResponse getEnv(String envId);
 
-    List<EnvResponse> getAllEnvs(int first, int max, String search);
+    /** userId'ye ait env kayitlarini listeler. */
+    List<EnvResponse> getAllEnvs(String userId, int first, int max, String search);
 
-    EnvResponse editEnv(String envId, EnvUpdateRequest request);
+    /** Sadece kaydin sahibi (userId) guncelleyebilir; baskasina aitse "bulunamadi" hatasi doner. */
+    EnvResponse editEnv(String envId, String userId, EnvUpdateRequest request);
 
-    void deleteEnv(String envId);
+    /** Sadece kaydin sahibi (userId) silebilir; baskasina aitse "bulunamadi" hatasi doner. */
+    void deleteEnv(String envId, String userId);
 }

@@ -56,11 +56,11 @@ class EnvControllerTest {
     }
 
     @Test
-    void getAllEnvsDelegatesPagingAndSearchToService() {
+    void getAllEnvsDelegatesUserIdPagingAndSearchToService() {
         List<EnvResponse> envs = List.of(EnvResponse.builder().id("env-1").build());
-        when(envService.getAllEnvs(0, 50, "local")).thenReturn(envs);
+        when(envService.getAllEnvs("user-1", 0, 50, "local")).thenReturn(envs);
 
-        ResponseEntity<List<EnvResponse>> response = envController.getAllEnvs(0, 50, "local");
+        ResponseEntity<List<EnvResponse>> response = envController.getAllEnvs("user-1", 0, 50, "local");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isSameAs(envs);
@@ -71,9 +71,9 @@ class EnvControllerTest {
         EnvUpdateRequest request = new EnvUpdateRequest();
         request.setUrl("http://localhost:6000");
         EnvResponse updated = EnvResponse.builder().id("env-1").url("http://localhost:6000").build();
-        when(envService.editEnv("env-1", request)).thenReturn(updated);
+        when(envService.editEnv("env-1", "user-1", request)).thenReturn(updated);
 
-        ResponseEntity<EnvResponse> response = envController.editEnv("env-1", request);
+        ResponseEntity<EnvResponse> response = envController.editEnv("env-1", "user-1", request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isSameAs(updated);
@@ -81,9 +81,9 @@ class EnvControllerTest {
 
     @Test
     void deleteEnvReturnsNoContentAndDelegatesToService() {
-        ResponseEntity<Void> response = envController.deleteEnv("env-1");
+        ResponseEntity<Void> response = envController.deleteEnv("env-1", "user-1");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        verify(envService).deleteEnv("env-1");
+        verify(envService).deleteEnv("env-1", "user-1");
     }
 }

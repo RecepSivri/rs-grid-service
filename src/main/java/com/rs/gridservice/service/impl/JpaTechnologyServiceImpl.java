@@ -5,6 +5,7 @@ import com.rs.gridservice.dto.TechnologyResponse;
 import com.rs.gridservice.dto.TechnologyUpdateRequest;
 import com.rs.gridservice.entity.TechnologyEntity;
 import com.rs.gridservice.exception.ResourceNotFoundException;
+import com.rs.gridservice.repository.ProjectRepository;
 import com.rs.gridservice.repository.TechnologyRepository;
 import com.rs.gridservice.service.TechnologyService;
 import jakarta.persistence.EntityManager;
@@ -12,6 +13,7 @@ import jakarta.persistence.TypedQuery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,6 +28,7 @@ import java.util.UUID;
 public class JpaTechnologyServiceImpl implements TechnologyService {
 
     private final TechnologyRepository technologyRepository;
+    private final ProjectRepository projectRepository;
     private final EntityManager entityManager;
 
     @Override
@@ -64,14 +67,25 @@ public class JpaTechnologyServiceImpl implements TechnologyService {
         return query.getResultList().stream().map(this::toResponse).toList();
     }
 
+    /**
+     * Isim degistiyse, bu Technology'yi zaten kullanan projelerin technology
+     * alanini da (salt bir isim kopyasi oldugu icin, bkz. ProjectRepository)
+     * ayni islemde gunceller -- yoksa mevcut projeler eski isimde takili kalir.
+     */
     @Override
+    @Transactional
     public TechnologyResponse editTechnology(String technologyId, TechnologyUpdateRequest request) {
         TechnologyEntity entity = technologyRepository.findById(technologyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Technology bulunamadi: id=" + technologyId));
 
+        String oldName = entity.getName();
         entity.setName(request.getName());
 
         TechnologyEntity saved = technologyRepository.save(entity);
+        if (!oldName.equals(request.getName())) {
+            int updatedProjects = projectRepository.renameTechnologyReferences(oldName, request.getName());
+            log.info("Technology adi degisti: id={}, {} projede technology guncellendi", technologyId, updatedProjects);
+        }
         log.info("Technology guncellendi: id={}", technologyId);
         return toResponse(saved);
     }

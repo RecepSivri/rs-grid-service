@@ -5,6 +5,7 @@ import com.rs.gridservice.dto.ProjectTypeResponse;
 import com.rs.gridservice.dto.ProjectTypeUpdateRequest;
 import com.rs.gridservice.entity.ProjectTypeEntity;
 import com.rs.gridservice.exception.ResourceNotFoundException;
+import com.rs.gridservice.repository.ProjectRepository;
 import com.rs.gridservice.repository.ProjectTypeRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
@@ -36,6 +37,8 @@ class JpaProjectTypeServiceImplTest {
     @Mock
     private ProjectTypeRepository projectTypeRepository;
     @Mock
+    private ProjectRepository projectRepository;
+    @Mock
     private EntityManager entityManager;
     @Mock
     private TypedQuery<ProjectTypeEntity> typedQuery;
@@ -44,7 +47,7 @@ class JpaProjectTypeServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new JpaProjectTypeServiceImpl(projectTypeRepository, entityManager);
+        service = new JpaProjectTypeServiceImpl(projectTypeRepository, projectRepository, entityManager);
         lenient().when(entityManager.createQuery(anyString(), eq(ProjectTypeEntity.class))).thenReturn(typedQuery);
         lenient().when(typedQuery.setFirstResult(anyInt())).thenReturn(typedQuery);
         lenient().when(typedQuery.setMaxResults(anyInt())).thenReturn(typedQuery);
@@ -128,6 +131,36 @@ class JpaProjectTypeServiceImplTest {
         ProjectTypeResponse response = service.editProjectType("type-1", request);
 
         assertThat(response.getName()).isEqualTo("desktop");
+    }
+
+    @Test
+    void editProjectTypeWithChangedNameCascadesRenameToExistingProjects() {
+        ProjectTypeEntity existing = sampleEntity(); // name = "web"
+        when(projectTypeRepository.findById("type-1")).thenReturn(Optional.of(existing));
+        when(projectTypeRepository.save(existing)).thenReturn(existing);
+
+        ProjectTypeUpdateRequest request = new ProjectTypeUpdateRequest();
+        request.setName("Web");
+
+        service.editProjectType("type-1", request);
+
+        // Project.type bir FK degil, isim kopyasi -- rename olunca zaten bu
+        // ismi kullanan projelerin de guncellenmesi gerekir.
+        verify(projectRepository).renameTypeReferences("web", "Web");
+    }
+
+    @Test
+    void editProjectTypeWithUnchangedNameDoesNotCascadeRename() {
+        ProjectTypeEntity existing = sampleEntity(); // name = "web"
+        when(projectTypeRepository.findById("type-1")).thenReturn(Optional.of(existing));
+        when(projectTypeRepository.save(existing)).thenReturn(existing);
+
+        ProjectTypeUpdateRequest request = new ProjectTypeUpdateRequest();
+        request.setName("web");
+
+        service.editProjectType("type-1", request);
+
+        verify(projectRepository, never()).renameTypeReferences(anyString(), anyString());
     }
 
     @Test
