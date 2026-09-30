@@ -5,6 +5,7 @@ import com.rs.gridservice.dto.PageResponse;
 import com.rs.gridservice.dto.PageUpdateRequest;
 import com.rs.gridservice.entity.PageEntity;
 import com.rs.gridservice.exception.ResourceNotFoundException;
+import com.rs.gridservice.repository.PageFieldRepository;
 import com.rs.gridservice.repository.PageRepository;
 import com.rs.gridservice.service.PageService;
 import jakarta.persistence.EntityManager;
@@ -12,6 +13,7 @@ import jakarta.persistence.TypedQuery;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,6 +28,7 @@ import java.util.UUID;
 public class JpaPageServiceImpl implements PageService {
 
     private final PageRepository pageRepository;
+    private final PageFieldRepository pageFieldRepository;
     private final EntityManager entityManager;
 
     @Override
@@ -113,9 +116,14 @@ public class JpaPageServiceImpl implements PageService {
         return toResponse(saved);
     }
 
+    /** PageField iliskisi JPA seviyesinde tanimli olmadigi (bkz. PageFieldEntity yorumu) icin
+     * cascade delete otomatik gelmiyor -- Page silinirken kendi alanlarini da acikca silmemiz gerekiyor,
+     * yoksa page_field'da sahipsiz satirlar birikir. */
     @Override
+    @Transactional
     public void deletePage(String pageId, String userId) {
         PageEntity entity = findOwnedPage(pageId, userId);
+        pageFieldRepository.deleteByPageId(pageId);
         pageRepository.delete(entity);
         log.info("Page silindi: id={}", pageId);
     }

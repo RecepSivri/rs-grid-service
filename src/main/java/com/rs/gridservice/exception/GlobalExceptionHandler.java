@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -58,6 +59,17 @@ public class GlobalExceptionHandler {
                         HashMap::new));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiError(HttpStatus.BAD_REQUEST.value(), "Bad Request", "Gecersiz istek", fieldErrors));
+    }
+
+    /** @Valid @RequestBody List&lt;T&gt; (orn. PageFieldController.replaceFields) icin: her liste elemaninin
+     * kendi @NotBlank/@NotNull ihlalleri MethodArgumentNotValidException DEGIL, bu ayri istisna turuyle
+     * gelir (Spring 6.1+ "parametre dogrulama" mekanizmasi) -- ayri bir handler gerekiyor, yoksa genel
+     * Exception.class handler'ina dusup 500 donuyor. */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiError> handleHandlerMethodValidation(HandlerMethodValidationException ex) {
+        String detail = ex.getBody().getDetail();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiError(HttpStatus.BAD_REQUEST.value(), "Bad Request", detail != null ? detail : "Gecersiz istek"));
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)

@@ -36,7 +36,8 @@ import java.util.List;
  *   "/api/v1/technologies/**") sadece Keycloak'ta "admin" realm rolune sahip kullanicilar
  *   tarafindan cagrilabilir -- bunlar referans/lookup verisi, normal kullanicinin gormesine gerek yok.
  *   Istisna: teknoloji listeleme (GET "/api/v1/technologies", getAll) "desktop_user" rolune de acik
- *   -- teknoloji tek getirme/ekleme/guncelleme/silme yine sadece admin'e ozel.
+ *   -- teknoloji tek getirme/ekleme/guncelleme/silme yine sadece admin'e ozel. Data type icin de ayni
+ *   istisna gecerli (GET "/api/v1/data-types" desktop_user'a acik, digerleri admin'e ozel).
  * - Proje, env ve page ("/api/v1/projects/**", "/api/v1/envs/**", "/api/v1/pages/**"): TUM metodlar
  *   (okuma dahil) sadece "admin" ya da "desktop_user" realm rolune sahip kullanicilar tarafindan
  *   cagrilabilir. Ayrica sahiplik servis katmaninda userId eslesmesiyle zorunlu kilinir (bkz.
@@ -79,6 +80,11 @@ public class SecurityConfig {
                             // genel "/api/v1/technologies/**" kuralindan ONCE tanimlanmali.
                             .requestMatchers(HttpMethod.GET, "/api/v1/technologies").hasAnyRole("admin", "desktop_user")
                             .requestMatchers("/api/v1/technologies", "/api/v1/technologies/**").hasRole("admin")
+                            // Data type listeleme (getAll) istisnasi: desktop_user de cagirabilir -- kendi
+                            // Page'inin alan (PageField) tasarimini yaparken dataType secmek icin bu listeye
+                            // ihtiyaci var. Digerleri (ekleme/guncelleme/silme) admin'e ozel kalir.
+                            .requestMatchers(HttpMethod.GET, "/api/v1/data-types").hasAnyRole("admin", "desktop_user")
+                            .requestMatchers("/api/v1/data-types", "/api/v1/data-types/**").hasRole("admin")
                             // Proje/env/page: admin veya desktop_user rolune sahip kullanicilar TUM CRUD
                             // islemlerini yapabilir; sahiplik kontrolu (userId eslesmesi) ayrica servis
                             // katmaninda uygulanir (bkz. JpaProjectServiceImpl/JpaEnvServiceImpl/JpaPageServiceImpl).
