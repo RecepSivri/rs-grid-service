@@ -62,6 +62,7 @@ public class JpaPageFieldServiceImpl implements PageFieldService {
                     .lookupTargetPageId(field.getLookupTargetPageId())
                     .lookupValueField(field.getLookupValueField())
                     .lookupTemplate(field.getLookupTemplate())
+                    .required(field.getRequired())
                     .sortOrder(order++)
                     .build());
         }
@@ -93,6 +94,7 @@ public class JpaPageFieldServiceImpl implements PageFieldService {
                 .lookupValueField(entity.getLookupValueField())
                 .lookupTemplate(entity.getLookupTemplate())
                 .sortOrder(entity.getSortOrder())
+                .required(Boolean.TRUE.equals(entity.getRequired()))
                 .build();
     }
 }

@@ -61,4 +61,10 @@ public class PageFieldEntity {
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
+
+    // Kasitli nullable + kutulu Boolean (visible/readonly gibi primitive+NOT NULL degil):
+    // bu kolon eklendiginde tabloda zaten satir vardi, ddl-auto=update bunlara NULL yazar --
+    // primitive boolean bunu okurken NPE atardi.
+    @Column(name = "required")
+    private Boolean required;
 }

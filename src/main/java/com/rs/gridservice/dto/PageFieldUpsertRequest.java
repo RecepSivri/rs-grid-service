@@ -28,6 +28,9 @@ public class PageFieldUpsertRequest {
     @NotNull(message = "readonly bos olamaz")
     private Boolean readonly;
 
+    @NotNull(message = "required bos olamaz")
+    private Boolean required;
+
     private String dataTypeId;
     private String lookupTargetPageId;
     private String lookupValueField;

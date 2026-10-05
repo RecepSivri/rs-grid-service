@@ -28,4 +28,5 @@ public class PageFieldResponse {
     private String lookupValueField;
     private String lookupTemplate;
     private int sortOrder;
+    private boolean required;
 }
