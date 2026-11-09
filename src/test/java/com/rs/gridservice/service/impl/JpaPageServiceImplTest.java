@@ -5,6 +5,7 @@ import com.rs.gridservice.dto.PageResponse;
 import com.rs.gridservice.dto.PageUpdateRequest;
 import com.rs.gridservice.entity.PageEntity;
 import com.rs.gridservice.exception.ResourceNotFoundException;
+import com.rs.gridservice.repository.PageFieldRepository;
 import com.rs.gridservice.repository.PageRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
@@ -36,6 +37,8 @@ class JpaPageServiceImplTest {
     @Mock
     private PageRepository pageRepository;
     @Mock
+    private PageFieldRepository pageFieldRepository;
+    @Mock
     private EntityManager entityManager;
     @Mock
     private TypedQuery<PageEntity> typedQuery;
@@ -44,7 +47,7 @@ class JpaPageServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new JpaPageServiceImpl(pageRepository, entityManager);
+        service = new JpaPageServiceImpl(pageRepository, pageFieldRepository, entityManager);
         lenient().when(entityManager.createQuery(anyString(), eq(PageEntity.class))).thenReturn(typedQuery);
         lenient().when(typedQuery.setParameter(anyString(), any())).thenReturn(typedQuery);
         lenient().when(typedQuery.setFirstResult(anyInt())).thenReturn(typedQuery);

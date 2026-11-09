@@ -33,6 +33,8 @@ public class PageFieldUpsertRequest {
 
     private String dataTypeId;
     private String lookupTargetPageId;
+    /** Bos/NULL ise istemci o an SECILI Ortam'i kullanir, bkz. PageFieldEntity. */
+    private String lookupEnvId;
     private String lookupValueField;
     private String lookupTemplate;
 }

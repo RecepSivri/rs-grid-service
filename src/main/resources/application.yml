@@ -53,6 +53,18 @@ rs-grid:
     connect-timeout-ms: 5000
     read-timeout-ms: 5000
     pool-size: 10
+  proxy:
+    # Tarayici modunda hedef API'ye istek ileten /api/v1/proxy. SSRF korumasi: link-local/metadata
+    # adresleri (169.254.0.0/16 ...) HER ZAMAN engelli; loopback ve ozel aglar (10/8, 172.16/12, 192.168/16 ...)
+    # varsayilan engelli. SADECE backend'in kullanicinin kendi makinesinde calistigi local gelistirmede true yapin:
+    # sunucuda "localhost" sunucunun kendisidir.
+    allow-private-networks: ${RS_GRID_PROXY_ALLOW_PRIVATE:false}
+    # allow-private-networks=false iken bile ozel adrese cozulmesine izin verilen host adlari (virgulle ayrilmis).
+    allowed-hosts: ${RS_GRID_PROXY_ALLOWED_HOSTS:}
+    connect-timeout-ms: 5000
+    read-timeout-ms: 30000
+    max-request-bytes: 2097152
+    max-response-bytes: 5242880
 
 logging:
   level:

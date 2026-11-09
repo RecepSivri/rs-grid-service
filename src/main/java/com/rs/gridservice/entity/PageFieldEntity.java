@@ -53,6 +53,13 @@ public class PageFieldEntity {
     @Column(name = "lookup_target_page_id")
     private String lookupTargetPageId;
 
+    // Lookup hedefinin HANGI Ortam'dan cozulecegi (Env.id). NULL/bos ise
+    // tuketici tarafi (rs-screen-builder) o an SECILI Ortam'i kullanir --
+    // bu kolon eklenmeden once kaydedilmis tum satirlarin davranisi budur,
+    // yani NULL kasitli ve anlamli bir deger ("secili Ortam'i takip et").
+    @Column(name = "lookup_env_id")
+    private String lookupEnvId;
+
     @Column(name = "lookup_value_field")
     private String lookupValueField;
 

@@ -4,6 +4,7 @@ import com.rs.gridservice.dto.DataTypeCreateRequest;
 import com.rs.gridservice.dto.DataTypeResponse;
 import com.rs.gridservice.dto.DataTypeUpdateRequest;
 import com.rs.gridservice.entity.DataTypeEntity;
+import com.rs.gridservice.exception.InvalidPatternException;
 import com.rs.gridservice.exception.ResourceNotFoundException;
 import com.rs.gridservice.repository.DataTypeRepository;
 import com.rs.gridservice.service.DataTypeService;
@@ -15,6 +16,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * DataType CRUD islemlerini kendi veritabanimizdaki ("data_type" tablosu)
@@ -30,10 +33,14 @@ public class JpaDataTypeServiceImpl implements DataTypeService {
 
     @Override
     public DataTypeResponse addDataType(DataTypeCreateRequest request) {
+        validatePattern(request.getPattern());
         DataTypeEntity entity = DataTypeEntity.builder()
                 .id(UUID.randomUUID().toString())
                 .name(request.getName())
                 .kind(request.getKind())
+                .pattern(request.getPattern())
+                .patternMessage(request.getPatternMessage())
+                .patternMessageEn(request.getPatternMessageEn())
                 .build();
 
         dataTypeRepository.save(entity);
@@ -67,11 +74,15 @@ public class JpaDataTypeServiceImpl implements DataTypeService {
 
     @Override
     public DataTypeResponse editDataType(String dataTypeId, DataTypeUpdateRequest request) {
+        validatePattern(request.getPattern());
         DataTypeEntity entity = dataTypeRepository.findById(dataTypeId)
                 .orElseThrow(() -> new ResourceNotFoundException("DataType bulunamadi: id=" + dataTypeId));
 
         entity.setName(request.getName());
         entity.setKind(request.getKind());
+        entity.setPattern(request.getPattern());
+        entity.setPatternMessage(request.getPatternMessage());
+        entity.setPatternMessageEn(request.getPatternMessageEn());
 
         DataTypeEntity saved = dataTypeRepository.save(entity);
         log.info("DataType guncellendi: id={}", dataTypeId);
@@ -87,11 +98,29 @@ public class JpaDataTypeServiceImpl implements DataTypeService {
         log.info("DataType silindi: id={}", dataTypeId);
     }
 
+    /** request.pattern bos/null degilse GECERLI bir regex oldugunu dogrular --
+     * aksi halde bu deger daha sonra her kayit eklenirken/duzenlenirken frontend'de
+     * (ve/veya burada, ileride sunucu tarafi dogrulama eklenirse) sessizce
+     * calismayan ya da PatternSyntaxException firlatan bir desen olarak kalirdi. */
+    private void validatePattern(String pattern) {
+        if (pattern == null || pattern.isBlank()) {
+            return;
+        }
+        try {
+            Pattern.compile(pattern);
+        } catch (PatternSyntaxException e) {
+            throw new InvalidPatternException("Gecersiz regex: " + e.getMessage());
+        }
+    }
+
     private DataTypeResponse toResponse(DataTypeEntity entity) {
         return DataTypeResponse.builder()
                 .id(entity.getId())
                 .name(entity.getName())
                 .kind(entity.getKind())
+                .pattern(entity.getPattern())
+                .patternMessage(entity.getPatternMessage())
+                .patternMessageEn(entity.getPatternMessageEn())
                 .build();
     }
 }

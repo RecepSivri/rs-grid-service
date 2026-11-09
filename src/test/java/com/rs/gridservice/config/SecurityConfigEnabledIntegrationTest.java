@@ -503,4 +503,51 @@ class SecurityConfigEnabledIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
+
+    private ResponseEntity<String> postProxy(String bearerToken, String json) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        if (bearerToken != null) {
+            headers.setBearerAuth(bearerToken);
+        }
+        return restTemplate.exchange(url("/api/v1/proxy"), HttpMethod.POST, new HttpEntity<>(json, headers), String.class);
+    }
+
+    @Test
+    void proxyWithoutTokenReturnsUnauthorized() {
+        ResponseEntity<String> response = postProxy(null, "{\"method\":\"GET\",\"url\":\"http://example.com/\"}");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void proxyWithoutRequiredRoleReturnsForbiddenWithApiErrorBody() {
+        when(jwtDecoder.decode("plain-user-token")).thenReturn(jwtWithRealmRoles("plain-user-token", List.of("offline_access")));
+
+        ResponseEntity<String> response = postProxy("plain-user-token", "{\"method\":\"GET\",\"url\":\"http://example.com/\"}");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("\"status\":403").contains("yetkiniz yok");
+    }
+
+    @Test
+    void proxyWithDesktopUserRoleReachesTheControllerAndRejectsCloudMetadataTargets() {
+        when(jwtDecoder.decode("user-desktop-token")).thenReturn(jwtWithRealmRoles("user-desktop-token", List.of("desktop_user")));
+
+        ResponseEntity<String> response = postProxy("user-desktop-token",
+                "{\"method\":\"GET\",\"url\":\"http://169.254.169.254/latest/meta-data/\"}");
+
+        // 403'u rol kontrolu degil, proxy'nin hedef politikasi uretiyor (govdede "yetkiniz yok" degil "metadata" gecer).
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getBody()).contains("metadata").doesNotContain("yetkiniz yok");
+    }
+
+    @Test
+    void proxyRejectsInvalidRequestBodyWithBadRequest() {
+        when(jwtDecoder.decode("user-desktop-token")).thenReturn(jwtWithRealmRoles("user-desktop-token", List.of("desktop_user")));
+
+        ResponseEntity<String> response = postProxy("user-desktop-token", "{\"method\":\"\",\"url\":\"http://example.com/\"}");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
 }

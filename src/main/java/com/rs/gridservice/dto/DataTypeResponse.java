@@ -20,4 +20,7 @@ public class DataTypeResponse {
     private String id;
     private String name;
     private DataTypeKind kind;
+    private String pattern;
+    private String patternMessage;
+    private String patternMessageEn;
 }

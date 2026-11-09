@@ -41,6 +41,20 @@ public class GlobalExceptionHandler {
                 .body(new ApiError(HttpStatus.UNAUTHORIZED.value(), "Unauthorized", ex.getMessage()));
     }
 
+    @ExceptionHandler(InvalidPatternException.class)
+    public ResponseEntity<ApiError> handleInvalidPattern(InvalidPatternException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiError(HttpStatus.BAD_REQUEST.value(), "Bad Request", ex.getMessage()));
+    }
+
+    /** Giden istek proxy'sinin (bkz. proxy.OutboundProxyService) reddi/hatasi: durum kodu istisnanin kendisinde. */
+    @ExceptionHandler(ProxyException.class)
+    public ResponseEntity<ApiError> handleProxy(ProxyException ex) {
+        HttpStatus status = HttpStatus.valueOf(ex.getStatus());
+        return ResponseEntity.status(status)
+                .body(new ApiError(status.value(), status.getReasonPhrase(), ex.getMessage()));
+    }
+
     @ExceptionHandler(KeycloakOperationException.class)
     public ResponseEntity<ApiError> handleKeycloakError(KeycloakOperationException ex) {
         log.error("Keycloak Admin API hatasi", ex);

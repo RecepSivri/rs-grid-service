@@ -18,4 +18,13 @@ public class DataTypeUpdateRequest {
 
     @NotNull(message = "kind bos olamaz")
     private DataTypeKind kind;
+
+    /** Opsiyonel bicim deseni (regex) -- bkz. DataTypeEntity.pattern. */
+    private String pattern;
+
+    /** Opsiyonel: pattern eslesmediginde gosterilecek mesaj (varsayilan/TR). */
+    private String patternMessage;
+
+    /** Opsiyonel: patternMessage'in Ingilizce karsiligi. */
+    private String patternMessageEn;
 }

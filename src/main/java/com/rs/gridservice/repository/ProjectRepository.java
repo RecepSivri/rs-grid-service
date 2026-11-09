@@ -6,7 +6,14 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface ProjectRepository extends JpaRepository<ProjectEntity, String> {
+
+    /** TestRunService.getRunsForUser icin: tek bir kullanicinin SAHIP OLDUGU tum
+     * projelerin id'lerini bulmak -- Dashboard'un "test durumu" ozeti HER projeyi
+     * TEK cagrida gostermesi gerekiyor (bkz. TestRunController). */
+    List<ProjectEntity> findByUserId(String userId);
 
     /**
      * Project.technology bir foreign key degil, Technology.name'in yazma aninda

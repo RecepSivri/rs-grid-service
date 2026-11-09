@@ -43,6 +43,9 @@ import java.util.List;
  *   cagrilabilir. Ayrica sahiplik servis katmaninda userId eslesmesiyle zorunlu kilinir (bkz.
  *   JpaProjectServiceImpl/JpaEnvServiceImpl/JpaPageServiceImpl), yani bu rollerden birine sahip bir
  *   kullanici bile sadece kendi kaydini duzenleyebilir/silebilir.
+ * - Proxy ("/api/v1/proxy"): "admin" ya da "desktop_user" -- hedef API'ye giden istekleri iletir (bkz. ProxyController).
+ * - Test calistirma anlik goruntuleri ("/api/v1/test-runs/**"): ayni roller, sahiplik servis katmaninda
+ *   (TestRunController/JpaTestRunServiceImpl).
  * - Kullanici okuma (GET "/api/v1/users/**") gecerli bir JWT'ye sahip herkese acik.
  * - Yetkisiz erisimlerde 403 doner.
  *
@@ -91,6 +94,14 @@ public class SecurityConfig {
                             .requestMatchers("/api/v1/projects", "/api/v1/projects/**", "/api/v1/envs", "/api/v1/envs/**",
                                     "/api/v1/pages", "/api/v1/pages/**")
                             .hasAnyRole("admin", "desktop_user")
+                            // Tarayici modunda hedef API'ye istek ileten proxy: ayni roller; hedef kisitlari
+                            // (ozel ag/metadata engeli, boyut ve sure siniri) proxy.TargetPolicy'de.
+                            .requestMatchers("/api/v1/proxy", "/api/v1/proxy/**").hasAnyRole("admin", "desktop_user")
+                            // Test calistirma anlik goruntuleri (Dashboard "Test Durumu" paneli): flat bir
+                            // ust-duzey kaynak ("/api/v1/projects/**" altinda DEGIL, bkz. TestRunController
+                            // javadoc) -- bu yuzden projects/envs/pages'in PAYLASTIGI kuraldan farkli olarak
+                            // kendi satirini gerektiriyor. Ayni roller, ayni sahiplik deseni (servis katmaninda).
+                            .requestMatchers("/api/v1/test-runs", "/api/v1/test-runs/**").hasAnyRole("admin", "desktop_user")
                             .anyRequest().authenticated())
                     .oauth2ResourceServer(oauth2 -> oauth2
                             .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))

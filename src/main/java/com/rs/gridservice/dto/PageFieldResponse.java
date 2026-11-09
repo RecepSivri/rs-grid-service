@@ -25,6 +25,7 @@ public class PageFieldResponse {
     private boolean readonly;
     private String dataTypeId;
     private String lookupTargetPageId;
+    private String lookupEnvId;
     private String lookupValueField;
     private String lookupTemplate;
     private int sortOrder;
